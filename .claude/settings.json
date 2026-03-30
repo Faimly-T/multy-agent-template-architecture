@@ -1,0 +1,24 @@
+{
+  "project": "Agent-WorkFlow-PO-PjM-Architect-V2",
+  "description": "Multi-agent planning team for knowledge capture — CODE 5-Phase Execution Relay",
+  "agents": {
+    "ux-persona": "agents/ux-persona/AGENT.md",
+    "ux-journey": "agents/ux-journey/AGENT.md",
+    "product-owner": "agents/product-owner/AGENT.md",
+    "project-manager": "agents/project-manager/AGENT.md",
+    "architect": "agents/architect/AGENT.md"
+  },
+  "skills": {
+    "rehydrate-context": "skills/rehydrate-context/SKILL.md",
+    "autonomous-capture": "skills/autonomous-capture/SKILL.md",
+    "strategic-organize": "skills/strategic-organize/SKILL.md",
+    "expert-distill": "skills/expert-distill/SKILL.md",
+    "express-relay": "skills/express-relay/SKILL.md",
+    "requirements-analysis": "skills/requirements-analysis/SKILL.md",
+    "backlog-management": "skills/backlog-management/SKILL.md",
+    "risk-assessment": "skills/risk-assessment/SKILL.md",
+    "architecture-design": "skills/architecture-design/SKILL.md",
+    "knowledge-capture": "skills/knowledge-capture/SKILL.md"
+  },
+  "outputDir": "outputagent"
+}

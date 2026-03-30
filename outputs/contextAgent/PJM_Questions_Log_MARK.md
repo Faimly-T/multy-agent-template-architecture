@@ -1,0 +1,31 @@
+# Questions Log MARK — Question Interviewer (PjM)
+
+## Active Questions
+
+| ID | Date Asked | Question | Context | Directed To | Blocker Level | Status |
+|---|---|---|---|---|---|---|
+
+---
+
+## Resolved Questions
+
+| ID | Question | Resolution | Resolved Date | Source |
+|---|---|---|---|---|
+
+---
+
+## Obsolete Questions
+
+| ID | Question | Reason Obsolete | Date Marked |
+|---|---|---|---|
+
+---
+
+## Question Patterns
+
+| Theme | Count | Example Questions | Suggested Action |
+|---|---|---|---|
+
+---
+
+*Log updated: 2026-03-29 — Initial (CODE upgrade)*

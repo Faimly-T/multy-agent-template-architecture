@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"C:\\\\Users\\\\ing_m\\\\OneDrive\\\\Documentos\\\\2nd Brain\\\\2026\\\\Projects\\\\Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)\\\\Agent-WorkFlow-PO-PjM-Architect V2\\\\outputs\\\\personas\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\ing_m\\\\OneDrive\\\\Documentos\\\\2nd Brain\\\\2026\\\\Projects\\\\Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)\\\\Agent-WorkFlow-PO-PjM-Architect V2\\\\context\")",
+      "Bash(find 'C:\\\\Users\\\\ing_m\\\\OneDrive\\\\Documentos\\\\2nd Brain\\\\2026\\\\Projects\\\\Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)\\\\Agent-WorkFlow-PO-PjM-Architect V2' -type f -name *.md -o -name *.json)",
+      "Bash(find:*)",
+      "Bash(find '/c/Users/ing_m/OneDrive/Documentos/2nd Brain/2026/Projects/Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)/Agent-WorkFlow-PO-PjM-Architect V2' -type f \\\\\\(-name *.md -o -name *.json \\\\\\))",
+      "Bash(find '/c/Users/ing_m/OneDrive/Documentos/2nd Brain/2026/Projects/Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)/Agent-WorkFlow-PO-PjM-Architect V2' -type f \\\\\\(-name *.md -o -name *.json \\\\\\) -exec wc -l {} +)",
+      "Bash(du:*)",
+      "Read(//c/Users/ing_m/OneDrive/Documentos/2nd Brain/2026/Projects/Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)/Agent-WorkFlow-PO-PjM-Architect V2/**)",
+      "Bash(bash /tmp/analysis.sh)",
+      "Bash(ls:*)",
+      "Bash(BASE=\"/c/Users/ing_m/OneDrive/Documentos/2nd Brain/2026/Projects/Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)/Agent-WorkFlow-PO-PjM-Architect V2/.claude/skills\")",
+      "Bash(__NEW_LINE_4bb2b8e329810fbd__ for:*)",
+      "Bash(do)",
+      "Bash(FILE=\"$BASE/$skill/SKILL.md\")"
+    ]
+  }
+}
