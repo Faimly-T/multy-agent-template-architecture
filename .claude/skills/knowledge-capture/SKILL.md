@@ -47,8 +47,9 @@ After any meeting, capture:
 
 ### 4. Knowledge Base Organization
 
+All output paths resolve from `.claude/settings.json`. The folder structure under `{paths.outputs}`:
 ```
-outputagent/
+{paths.outputs}/
   decisions/          # Architecture & product decisions (ADR format)
     INDEX.md          # Master list of all decisions
     ADR-001-*.md      # Individual decision records
@@ -57,11 +58,8 @@ outputagent/
   meetings/           # Meeting notes and action items
   plans/              # Project and sprint plans
   architecture/       # Architecture documents and diagrams
-  stories/            # User stories
-  backlog/            # Backlog snapshots
   risks/              # Risk assessments
   status/             # Status reports
-  vision/             # Product vision documents
 ```
 
 ### 5. Capture Triggers
@@ -69,12 +67,12 @@ outputagent/
 Set up automatic capture at these events:
 | Event | What to Capture | Where |
 |---|---|---|
-| Decision made | ADR | `outputagent/decisions/` |
-| Sprint completed | Retrospective + lessons | `outputagent/lessons/` |
-| Meeting held | Notes + actions | `outputagent/meetings/` |
-| Requirement changed | Change record + rationale | `outputagent/decisions/` |
-| Risk identified | Risk entry | `outputagent/risks/` |
-| Architecture changed | Updated diagram + ADR | `outputagent/architecture/` |
+| Decision made | ADR | `{paths.decisions}` |
+| Sprint completed | Retrospective + lessons | `{paths.outputs}/lessons/` |
+| Meeting held | Notes + actions | agent's configured output folder |
+| Requirement changed | Change record + rationale | `{paths.decisions}` |
+| Risk identified | Risk entry | `{paths.outputs}/risks/` |
+| Architecture changed | Updated diagram + ADR | agent's configured output folder |
 
 ## Quality Checklist
 

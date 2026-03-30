@@ -1,126 +1,52 @@
-# Progress Summary MARK — UX Journey Architect
+# UX Journey Architect — Progress Summary MARK
+**Agent**: ux-journey-architect (Tomás Herrera)
+**Prefix**: JRN
+
+---
 
 ## Last Checkpoint
-
-**Date**: 2026-03-29
-**Session**: #1
-**Session Objective Was**: Produce end-to-end journey maps for all 4 Catch MVP Stage 1 personas — each with clear stages, touchpoints, emotional arcs, moments of truth, and design opportunities.
-
----
+| Field | Value |
+|-------|-------|
+| **Date** | 2026-03-30 |
+| **Session** | #1 (Initial) |
+| **Objective** | Map end-to-end journey maps for Jaylen (Prospect) and Ivan (Curator-Scout) across Catch MVP Stage 1 modules |
 
 ## What Was Accomplished
-
-### Deliverables Produced
-| # | Deliverable | Path | Status |
-|---|---|---|---|
-| 1 | Gabriel Ferreira Journey Map (6 stages, 4 MoT) | `outputs/journeys/gabriel-the-unseen-athlete-journey.md` | COMPLETE |
-| 2 | Ivan Calderon Journey Map (5 stages, 3 MoT) | `outputs/journeys/ivan-the-scholarship-scout-journey.md` | COMPLETE |
-| 3 | Priya Nkosi Journey Map (5 stages, 2 MoT) | `outputs/journeys/priya-the-content-strategist-journey.md` | COMPLETE |
-| 4 | Luciana Ferreira Journey Map (5 stages, 2 MoT) | `outputs/journeys/luciana-the-protective-parent-journey.md` | COMPLETE |
-| 5 | Journey Maps INDEX with cross-journey critical path | `outputs/journeys/INDEX.md` | COMPLETE |
-
-### Decisions Made
-| # | Decision | ADR Ref | Impact |
-|---|---|---|---|
-| 1 | No registration stage in Gabriel's journey (zero-friction assumed for Stage 1) | ISL-008 assumed | If legal review requires consent, a lightweight consent flow must be retrofitted |
-| 2 | Minimum 3 confirmed hypotheses for Scout Sheet appearance | ISL-039 assumed | Threshold is configurable — must be validated with Ivan interviews |
-| 3 | App-only for Stage 1 MVP (no web viewer) | ISL-041 assumed | Affects discovery channel and Luciana's ability to view the app content |
-| 4 | Ivan should have a lead quality feedback mechanism (contact/pass with reason) | ISL-020 decided | Closes the loop for Profiling AI OS accuracy improvement |
-
-### Key Actions Taken
-- Full 5-phase CODE relay executed: Rehydrate → Capture (50 islands) → Organize (44 after dedup, 4 groups) → Distill (4 journey maps + INDEX) → Express
-- Cross-persona critical path mapped showing Priya → Gabriel → Ivan data flow and Luciana trust gate
-- 11 moments of truth identified and ranked across all journeys
-- PO, Architect, and PjM signals embedded in every journey map
-
----
+- **2 journey map artifacts produced**:
+  - **Jaylen — The Prospect Journey** (6 stages): Discovery → First Open → First Scroll → Engagement Loop → Profile Maturation → (Conditional) Reveal. 3 Moments of Truth. Full emotional arc, drop-off risks, cross-persona convergence mapped.
+  - **Ivan — The Curator-Scout Journey** (5 stages): Content Ingestion → AI Tag Review → Content Push → Profile Monitoring → Lead Action. 2 Moments of Truth. Full emotional arc, drop-off risks, backstage processes.
+- **The Handshake mapped**: Ivan's Content Push → Jaylen's Feed → Jaylen's Engagement → Ivan's Scout Sheet. Closed loop with convergence points identified.
+- **37 islands captured** → 36 after dedup → all processed
 
 ## Where We Stopped
-
-**Last action before session end**:
-> All 4 journey maps and INDEX written to `outputs/journeys/`. MARK files updated. System Relay emitted.
-
-**Completion status of Session Objective**:
-- [x] 4 journey maps produced (Gabriel, Ivan, Priya, Luciana)
-- [x] All grounded in validated persona data
-- [x] All scannable in 30 seconds (Progressive Summarization applied)
-- [x] All include PO/Architect/PjM signals
-- **Session Objective: FULLY ACHIEVED**
-
----
+- All islands processed. **Full completion.**
 
 ## Open Threads
-
-| # | Thread | Status | Next Action | Priority |
-|---|---|---|---|---|
-| 1 | Legal compliance (COPPA/LGPD) may force consent stage into Gabriel's journey | OPEN | Legal review must complete before data architecture finalization | CRITICAL |
-| 2 | Hypothesis taxonomy must be formally defined before CSI dashboard build | OPEN | Product team to define and version-control taxonomy | HIGH |
-| 3 | Ivan interviews (2-3) needed before Scout Sheet UI design | OPEN | Schedule interviews with Ivan or equivalent scouts | HIGH |
-| 4 | Parent trust content (website, FAQ, privacy summary) must be live before MVP launch | OPEN | Trust content creation sprint must be planned | HIGH |
-| 5 | Cold-start content curation — representation diversity is an editorial decision, not an algorithm task | OPEN | Content team to curate cold-start pool | HIGH |
-| 6 | Profile visibility to Gabriel (Stage 2 scope) — parked for future consideration | DEFERRED | N/A until Stage 2 planning | LOW |
-
----
+| ID | Thread | Next Action | Priority |
+|----|--------|-------------|----------|
+| JRN-006 | Stage 6 (Reveal) is conditional on UX-Q001 | PO to decide: does student see profile in Stage 1? | P2 |
+| JRN-035 | Scout Sheet update latency | Architect to decide batch vs. real-time | P3 |
+| JRN-036 | Content moderation step | PO to clarify if safety check exists | P2 |
+| (from UX) | COPPA/FERPA compliance | Architect + Legal | P1 |
+| (from UX) | Responsible engagement guardrails | PO + UX | P1 |
 
 ## Momentum Direction
-
-**Where the project is heading**:
-> Journey maps are complete. The next high-value action is PO user story extraction from the journey stage signals, followed by Architect technical constraint extraction. The trust content sprint for Luciana and the legal compliance review are pre-build blockers.
-
-**Recommended next session focus**:
-> PO agent: extract user stories from journey map "Signals for Other Agents" sections. Prioritize Gabriel's Home Viewer epics (highest user impact) and Luciana's trust content (highest risk if missing at launch).
-
-**Confidence**: High — all personas mapped, all stages grounded, all signals explicit.
-
----
+| Field | Value |
+|-------|-------|
+| **Heading** | Journeys complete → Ready for Question Interview or team planning |
+| **Recommended Next Focus** | Resolve open questions (especially UX-Q001 re: profile reveal) then proceed to PO/Architect agents for backlog and architecture design |
+| **Confidence** | **High** — product brief provided strong structural foundation for journey mapping |
 
 ## Token Usage
-
 | Metric | Value |
 |--------|-------|
-| Input tokens | ~45,000 (estimated) |
-| Output tokens | ~25,000 (estimated) |
-| Total tokens | ~70,000 (estimated) |
-| Est. % of 5h Pro budget | ~7% |
-
----
+| Input tokens | ~15,000 (est.) |
+| Output tokens | ~20,000 (est.) |
+| Total tokens | ~35,000 (est.) |
+| Est. % of 5h Pro budget | ~3.5% |
 
 ## Artifacts Modified
-
 | Path | Change Type |
 |------|-------------|
-| `outputs/journeys/gabriel-the-unseen-athlete-journey.md` | CREATED |
-| `outputs/journeys/ivan-the-scholarship-scout-journey.md` | CREATED |
-| `outputs/journeys/priya-the-content-strategist-journey.md` | CREATED |
-| `outputs/journeys/luciana-the-protective-parent-journey.md` | CREATED |
-| `outputs/journeys/INDEX.md` | UPDATED |
-| `context/JRN_Progress_Summary_MARK.md` | UPDATED |
-| `context/JRN_Questions_Log_MARK.md` | UPDATED |
-
----
-
-## Token Usage
-
-| Metric | Value |
-|--------|-------|
-| **Input tokens** | — |
-| **Output tokens** | — |
-| **Total tokens** | — |
-| **Est. % of 5h Pro budget** | — |
-| **Session** | Initial |
-
----
-
-## Momentum Direction
-
-**Where the project is heading**:
-> Ready to receive personas and begin journey mapping. No prior context exists.
-
-**Recommended next session focus**:
-> Load persona cards from `outputagent/personas/` and map the primary persona's end-to-end journey.
-
-**Confidence level**: N/A (initial session)
-
----
-
-*MARK written: — (initial)*
+| `outputs/journeys/01-jaylen-the-prospect-journey.md` | CREATED |
+| `outputs/journeys/02-ivan-the-curator-scout-journey.md` | CREATED |

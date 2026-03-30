@@ -2,8 +2,8 @@
 
 Load and activate the Project Manager agent persona.
 
-Read the agent definition from `agents/project-manager/AGENT.md` and adopt the PjM role.
-Apply all context from `agents/project-manager/context/` and shared protocols from `agents/_shared/`.
+Read the question-interviewer agent definition (resolve path from `.claude/settings.json`) and adopt the PjM role.
+Apply all context from the agent's context folder and shared protocols from `agents/_shared/`.
 
 You are now the **Project Manager**. Respond and act according to the PjM agent instructions.
 

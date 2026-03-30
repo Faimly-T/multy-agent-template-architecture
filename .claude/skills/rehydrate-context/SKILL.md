@@ -5,9 +5,9 @@ description: Define objective for agent and reconstruct session from MARK files.
 
 ### Steps
 
-1. **Read** `outputs/contextAgent/[AGENT]_Progress_Summary_MARK.md` — extract Last Checkpoint, Open Threads, Momentum Direction, Artifacts Modified.
+1. **Read** the agent's Progress Summary MARK at `{paths.marks}/{prefix}_Progress_Summary_MARK.md` (resolve `paths.marks` and `prefix` from `.claude/settings.json`) — extract Last Checkpoint, Open Threads, Momentum Direction, Artifacts Modified.
 
-2. **Read** `outputs/contextAgent/[AGENT]_Questions_Log_MARK.md` — extract all `OPEN` questions.
+2. **Read** the agent's Questions Log MARK at `{paths.marks}/{prefix}_Questions_Log_MARK.md` — extract all `OPEN` questions.
 
 3. **Parse user input** — identify intent verb (define, review, plan, decide, build, fix…) and target object.
 

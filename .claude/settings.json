@@ -1,12 +1,47 @@
 {
   "project": "Agent-WorkFlow-PO-PjM-Architect-V2",
   "description": "Multi-agent planning team for knowledge capture — CODE 5-Phase Execution Relay",
+  "paths": {
+    "outputs": "outputs",
+    "marks": "outputs/contextAgent",
+    "decisions": "outputs/decisions"
+  },
   "agents": {
-    "ux-persona": "agents/ux-persona/AGENT.md",
-    "ux-journey": "agents/ux-journey/AGENT.md",
-    "product-owner": "agents/product-owner/AGENT.md",
-    "project-manager": "agents/project-manager/AGENT.md",
-    "architect": "agents/architect/AGENT.md"
+    "ux-persona": {
+      "file": "agents/ux-persona/AGENT.md",
+      "prefix": "UX",
+      "output": "outputs/personas",
+      "template": "agents/ux-persona/context/persona-card-template.md",
+      "role": "agents/ux-persona/context/ROLE.md"
+    },
+    "ux-journey": {
+      "file": "agents/ux-journey/AGENT.md",
+      "prefix": "JRN",
+      "output": "outputs/journeys",
+      "template": "agents/ux-journey/context/journey-map-template.md",
+      "role": "agents/ux-journey/context/ROLE.md"
+    },
+    "question-interviewer": {
+      "file": "agents/question-interviewer/AGENT.md",
+      "prefix": "PJM",
+      "output": "outputs/meetings",
+      "template": "agents/question-interviewer/context/question-interview-template.md",
+      "role": "agents/question-interviewer/context/ROLE.md"
+    },
+    "product-owner": {
+      "file": "agents/product-owner/AGENT.md",
+      "prefix": "PO",
+      "output": "outputs/plans",
+      "template": null,
+      "role": "agents/product-owner/context/ROLE.md"
+    },
+    "architect": {
+      "file": "agents/architect/AGENT.md",
+      "prefix": "ARCH",
+      "output": "outputs/architecture",
+      "template": null,
+      "role": "agents/architect/context/ROLE.md"
+    }
   },
   "skills": {
     "rehydrate-context": "skills/rehydrate-context/SKILL.md",
@@ -20,5 +55,12 @@
     "architecture-design": "skills/architecture-design/SKILL.md",
     "knowledge-capture": "skills/knowledge-capture/SKILL.md"
   },
-  "outputDir": "outputagent"
+  "chainOrder": ["ux-persona", "ux-journey"],
+  "authority": {
+    "personas": "ux-persona",
+    "journeys": "ux-journey",
+    "scope": "product-owner",
+    "technical": "architect",
+    "questions": "question-interviewer"
+  }
 }

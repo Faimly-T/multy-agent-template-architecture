@@ -25,7 +25,7 @@
 ### Decisions Made
 | # | Decision | ADR Ref | Impact |
 |---|---|---|---|
-| 1 | | `outputagent/decisions/ADR-XXX.md` | |
+| 1 | | `{paths.decisions}/ADR-XXX.md` | |
 
 ### Key Actions Taken
 1. 

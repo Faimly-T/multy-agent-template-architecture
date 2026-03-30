@@ -13,7 +13,7 @@ description: Distill each island into a concrete result or formal concern.
    |-------------|--------|---------|
    | PREREQUISITE | Read, confirm current, extract info | RESULT:REVIEWED |
    | DECISION | State options (≥2), apply Decision Framework, recommend/decide | RESULT:DECIDED or CONCERN:NEEDS-APPROVAL |
-   | WORK | Produce artifact using agent's output template, write to outputagent/ | RESULT:PRODUCED |
+   | WORK | Produce artifact using agent's output template, write to agent's configured output folder (from `.claude/settings.json`) | RESULT:PRODUCED |
    | QUESTION | Record answer + source | RESULT:ANSWERED |
    | RISK | Assess probability/impact, propose mitigation | RESULT:MITIGATED or CONCERN:ESCALATED |
    | DEPENDENCY | Check resolution status | RESULT:RESOLVED or CONCERN:BLOCKED |
@@ -29,8 +29,8 @@ description: Distill each island into a concrete result or formal concern.
 
 ### Output
 - **Results Ledger** (inline → Phase 5 consumes it)
-- **Domain artifacts** → `outputagent/[subfolder]/`
-- **Decision records** → `outputagent/decisions/ADR-XXX-[title].md`
+- **Domain artifacts** → agent's configured output folder (`{agent.output}` from `.claude/settings.json`)
+- **Decision records** → `{paths.decisions}/ADR-XXX-[title].md` (from `.claude/settings.json`)
 | A WORK island produces an artifact that conflicts with an existing artifact | Do NOT overwrite silently. Log as CONCERN: "New artifact conflicts with existing [path]. Both versions preserved. User must resolve." Save new artifact with `-V[N+1]` suffix. |
 | A DECISION island has no clear winner among options | Present all options with trade-offs to user. Mark as `CONCERN:NEEDS-APPROVAL`. Do not force a decision without sufficient basis. |
 | An island takes unexpectedly long | After completing the current island, assess remaining queue. If >50% remains, switch to "highlight mode" — produce skeleton/outline results for remaining islands instead of full distillation. Mark as `RESULT:OUTLINE`. |

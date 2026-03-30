@@ -4,7 +4,7 @@ Notify agents that their open questions have been answered by the Question Inter
 
 ## Trigger
 
-Emitted automatically by the Question Interviewer agent (project-manager) after completing an interview session (Step 6). Can also be run manually.
+Emitted automatically by the Question Interviewer agent (question-interviewer) after completing an interview session (Step 6). Can also be run manually.
 
 ## Workflow
 

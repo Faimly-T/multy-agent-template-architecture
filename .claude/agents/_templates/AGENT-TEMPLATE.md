@@ -7,10 +7,9 @@ Create new agents using this compressed template. All agents follow the **CODE 5
 agents/<agent-name>/
   AGENT.md              # Agent OS (this file)
   context/
+    ROLE.md             # Identity, Mandate, Facts & Directives
     *.md                # Domain context + output templates
-  outputs/
-    [AGENT]_Progress_Summary_MARK.md
-    [AGENT]_Questions_Log_MARK.md
+# MARK files live in {paths.marks}/ — register prefix in .claude/settings.json
 ```
 
 ---
@@ -28,16 +27,7 @@ description: [1-line: what this agent transforms and for whom]
 tools: [editFiles, createFile]
 ---
 
-# Identity
-| Field | Value |
-|-------|-------|
-| **Role** | [Specialized Role] |
-| **Persona** | [Name] ([MBTI]). [Style in 3-4 words]. |
-| **Authority** | Full autonomy over [domain]. Owns [what]. |
-| **Boundary** | OWNS: [list]. DOES NOT OWN: [list]. |
-
-## Mandate
-> [1-2 sentences: what this agent delivers and why it matters]
+**Load role**: Read agent's configured role file (from `.claude/settings.json`) — adopt Identity, Mandate, and Facts & Directives before proceeding.
 
 # Steps
 
@@ -52,20 +42,48 @@ Execute sequentially. **Read each skill file ONLY when entering that step.**
 3. **Map, group, and sequence the Island Backlog** with `strategic-organize` — [domain-specific clustering logic]. [Merge criteria]. [Classification scheme].
    Gate: [structure gate]
 
-4. **Distill each island into a concrete result** with `expert-distill` — produce [Artifacts] per `context/[output-template].md`. [Domain quality criteria]. Progressive Summarization — scannable in 30s.
+4. **Distill each island into a concrete result** with `expert-distill` — produce [Artifacts] per agent's configured template (from `.claude/settings.json`). [Domain quality criteria]. Progressive Summarization — scannable in 30s.
    **Decisions**: [3-5 decision criteria as · separated · list]
    **[Domain] check**: [Validation criteria as · separated · list]
    Gate: All → [Artifact] or Concern
 
-5. **Update MARK files and emit** relay with `express-relay` — write [artifacts] to `outputagent/[domain]/`. Emit relay.
+5. **Update MARK files and emit** relay with `express-relay` — write [artifacts] to agent's configured output folder. Emit relay.
    Gate: MARKs + [Artifacts] + Relay
 
 # Persistence
-| File | Purpose |
-|------|---------|
-| `outputs/contextAgent/[AGENT]_Progress_Summary_MARK.md` | Session continuity |
-| `outputs/contextAgent/[AGENT]_Questions_Log_MARK.md` | Open questions log |
-| `outputs/contextAgent/[output-template].md` | Output template (read in Step 4 only) |
+All paths (MARK files, output folder, template, role) resolve from `.claude/settings.json`. Register new agents there with: file, prefix, output, template, role.
+```
+
+---
+
+## ROLE.md Template
+
+Create `context/ROLE.md` for each agent. To **reuse a role**, point multiple agents to the same ROLE.md in settings.json.
+
+```markdown
+---
+name: [role-name]
+description: [1-line role summary]
+---
+
+# Identity
+
+| Field | Value |
+|-------|-------|
+| **Role** | [Specialized Role] |
+| **Persona** | [Name] ([MBTI]). [Style in 3-4 words]. |
+| **Authority** | Full autonomy over [domain]. Owns [what]. |
+| **Boundary** | OWNS: [list]. DOES NOT OWN: [list]. |
+
+## Mandate
+
+> [1-2 sentences: what this agent delivers and why it matters]
+
+## Facts & Directives
+
+- [Behavioral guideline 1]
+- [Behavioral guideline 2]
+- [Domain-specific constraint or preference]
 ```
 
 ---
@@ -81,7 +99,7 @@ Execute sequentially. **Read each skill file ONLY when entering that step.**
 
 ## Progress Summary MARK Template
 
-Seed new `outputs/contextAgent/[PREFIX]_Progress_Summary_MARK.md` files with this structure:
+Seed new `{paths.marks}/[PREFIX]_Progress_Summary_MARK.md` files (resolve `{paths.marks}` from `.claude/settings.json`) with this structure:
 
 ```markdown
 # Progress Summary MARK — [Agent Name]
@@ -138,7 +156,7 @@ Seed new `outputs/contextAgent/[PREFIX]_Progress_Summary_MARK.md` files with thi
 
 ## Questions Log MARK Template
 
-Seed new `outputs/contextAgent/[PREFIX]_Questions_Log_MARK.md` files:
+Seed new `{paths.marks}/[PREFIX]_Questions_Log_MARK.md` files:
 
 ```markdown
 # Questions Log MARK — [Agent Name]

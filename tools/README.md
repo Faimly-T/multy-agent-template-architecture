@@ -5,7 +5,7 @@ This directory defines external tool integrations and custom tool definitions fo
 ## Available Tool Categories
 
 ### File Management
-- Read/write project artifacts in `outputagent/`
+- Read/write project artifacts in `{paths.outputs}` (from `.claude/settings.json`)
 - Manage context files for each agent
 
 ### Search & Retrieval

@@ -7,7 +7,7 @@ description: Update MARK files and emit System Relay.
 
 1. **Compile session state** from all phases: Session Objective, Island count, Roadmap stats, Results Ledger.
 
-2. **Overwrite `[AGENT]_Progress_Summary_MARK.md`** with:
+2. **Overwrite** the agent's Progress Summary MARK at `{paths.marks}/{prefix}_Progress_Summary_MARK.md` (resolve from `.claude/settings.json`) with:
    - Last Checkpoint (date, session #, objective)
    - What Was Accomplished (deliverables produced, decisions made, key actions)
    - Where We Stopped (last island processed, completion status: full/partial/blocked)
@@ -16,7 +16,7 @@ description: Update MARK files and emit System Relay.
    - Token Usage (estimated input tokens, output tokens, total, % of 5-hour Pro budget)
    - Artifacts Modified (paths + change types)
 
-3. **Update `[AGENT]_Questions_Log_MARK.md`**:
+3. **Update** the agent's Questions Log MARK at `{paths.marks}/{prefix}_Questions_Log_MARK.md`:
    - RESOLVED questions → move to Resolved section with detail
    - OBSOLETE questions → move with reason
    - New OPEN questions from Phases 2-4 → add to Active section
@@ -40,16 +40,7 @@ description: Update MARK files and emit System Relay.
 
 ### MARK File Contract
 
-This is the persistence contract that binds all sessions together:
-
-```
-Session N (this session):
-  Phase 1: READ  [AGENT]_Progress_Summary_MARK.md  ← written by Session N-1
-  Phase 1: READ  [AGENT]_Questions_Log_MARK.md      ← written by Session N-1
-  ...
-  Phase 5: WRITE [AGENT]_Progress_Summary_MARK.md   → read by Session N+1
-  Phase 5: WRITE [AGENT]_Questions_Log_MARK.md       → read by Session N+1
-```
+Paths resolve from `.claude/settings.json`: `{paths.marks}/{prefix}_Progress_Summary_MARK.md` and `{paths.marks}/{prefix}_Questions_Log_MARK.md`. Session N-1 Phase 5 WRITES → Session N Phase 1 READS → Session N Phase 5 WRITES → Session N+1 reads.
 
 **Invariants:**
 - MARK files are ALWAYS updated at session end, even for short or interrupted sessions.

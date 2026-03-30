@@ -8,8 +8,8 @@ Run this command when one or more agents have completed their sessions and have 
 
 ## Workflow
 
-1. Read `agents/project-manager/AGENT.md` and adopt the Question Interviewer role.
-2. Apply all context from `agents/question-interviewer/context/` and shared protocols from `agents/_shared/`.
+1. Read the question-interviewer agent definition (resolve path from `.claude/settings.json`) and adopt the Question Interviewer role.
+2. Apply all context from the agent's context folder and shared protocols from `agents/_shared/`.
 3. Execute the full CODE 5-Phase Relay as defined in the agent's Steps.
 4. The agent will read the named agents' Question Log MARKs, consolidate questions, interview the user, and write answers back.
 
@@ -22,11 +22,8 @@ For the agents specified in: $ARGUMENTS
 - If no arguments provided, scan ALL agents' Question Log MARKs for active questions.
 - Example: `/collect-questions ux-persona ux-journey`
 
-## Agent Name → MARK Path Mapping
+## Path Resolution
 
-| Agent Name | Progress Summary MARK | Questions Log MARK |
-|------------|----------------------|-------------------|
-| `ux-persona` | `agents/ux-persona/context/UX_Progress_Summary_MARK.md` | `agents/ux-persona/context/UX_Questions_Log_MARK.md` |
-| `ux-journey` | `agents/ux-journey/context/JRN_Progress_Summary_MARK.md` | `agents/ux-journey/context/JRN_Questions_Log_MARK.md` |
-| `product-owner` | `agents/product-owner/context/PO_Progress_Summary_MARK.md` | `agents/product-owner/context/PO_Questions_Log_MARK.md` |
-| `architect` | `agents/architect/context/ARCH_Progress_Summary_MARK.md` | `agents/architect/context/ARCH_Questions_Log_MARK.md` |
+Resolve all agent MARK paths from `.claude/settings.json`:
+- Progress MARK: `{paths.marks}/{agent.prefix}_Progress_Summary_MARK.md`
+- Questions MARK: `{paths.marks}/{agent.prefix}_Questions_Log_MARK.md`

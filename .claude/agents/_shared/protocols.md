@@ -56,11 +56,11 @@ When agents disagree:
 5. The PO has final authority on **scope and priority**
 6. The Architect has final authority on **technical approach**
 7. The PjM (Question Interviewer) has final authority on **question consolidation, interview facilitation, and answer distribution**
-8. All resolutions are logged as decisions in `outputagent/decisions/`
+8. All resolutions are logged as decisions in `{paths.decisions}` (from `.claude/settings.json`)
 
 ### File I/O Permissions
 
-Agents and skills have **full read/write access** to `outputagent/` and agent `context/` folders without requiring user confirmation. Create files and directories as needed during execution.
+Agents and skills have **full read/write access** to `{paths.outputs}` (from `.claude/settings.json`) and agent `context/` folders without requiring user confirmation. Create files and directories as needed during execution.
 
 ### Quality Standards
 
@@ -74,7 +74,7 @@ Agents and skills have **full read/write access** to `outputagent/` and agent `c
 ### Knowledge Capture Rule
 
 Every significant discussion, decision, or insight must be captured:
-- Decisions → `outputagent/decisions/` (ADR format)
-- Lessons learned → `outputagent/lessons/`
-- Meeting outcomes → `outputagent/meetings/`
+- Decisions → `{paths.decisions}` (from `.claude/settings.json`, ADR format)
+- Lessons learned → `{paths.outputs}/lessons/`
+- Meeting outcomes → agent's configured output folder
 - Session state → MARK files (updated every Phase 5)

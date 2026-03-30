@@ -83,7 +83,7 @@ The **critical boundary** is between Phase 2 and Phase 3: the system shifts from
    └──────┬──────┘        └──────────────┘                │
           │                                                │
           │           ┌─────────────────┐                  │
-          └──────────▶│  outputagent/    │◀────────────────┘
+          └──────────▶│   outputs/      │◀────────────────┘
                       │  (All Artifacts) │
                       └─────────────────┘
 
@@ -96,7 +96,7 @@ The **critical boundary** is between Phase 2 and Phase 3: the system shifts from
 |-------|---------|-----------|
 | **Agent Layer** | Domain expertise, quality criteria, chaining logic | AGENT.md files (one per domain) |
 | **Skill Layer** | Execution mechanics, error handling, I/O contracts | SKILL.md files (shared across agents) |
-| **Persistence Layer** | Cross-session continuity, cross-agent communication | MARK files, outputagent/ artifacts |
+| **Persistence Layer** | Cross-session continuity, cross-agent communication | MARK files, `{paths.outputs}` artifacts |
 
 ---
 
@@ -177,19 +177,18 @@ tools: [editFiles, createFile]
 ```
 
 Followed by:
-- **Identity**: Persona name, MBTI type, role title, characteristics
-- **Authority/Boundary**: What they own vs. what they explicitly do NOT own
-- **Mandate**: One sentence describing their transformation (input -> output)
+- **Load role**: Read the agent's configured ROLE.md file (from `.claude/settings.json`) — Identity, Mandate, and Facts & Directives
 - **Steps**: 5-6 numbered steps, each invoking a skill via trigger phrase + adding domain-specific lens and gate criteria
-- **Persistence**: Table mapping MARK files and context files
+
+Identity, Mandate, and **Facts & Directives** (behavioral guidelines the agent must follow) live in a separate `ROLE.md` file in the agent's `context/` folder. This enables **role reuse** — multiple agents can point to the same ROLE.md in settings.json.
 
 ### Active Agents (CODE-upgraded)
 
 | Agent | Persona | Domain | Input | Output | Writes To |
 |-------|---------|--------|-------|--------|-----------|
-| **UX Persona** | Clara Mendes (ENFJ-A) | Personas, segments, JTBD, empathy maps | Product description | Persona Cards | `outputagent/personas/` |
-| **UX Journey** | Tomas Herrera (INTJ-A) | Journey maps, touchpoints, emotional arcs | Validated Personas | Journey Maps | `outputagent/journeys/` |
-| **Question Interviewer (PjM)** | Rafael Mori (ENFJ-T) | Question consolidation, user interviews, answer distribution | Agent Question Log MARKs | Interview Transcripts | `outputagent/meetings/` |
+| **UX Persona** | Clara Mendes (ENFJ-A) | Personas, segments, JTBD, empathy maps | Product description | Persona Cards | `{agent.output}` |
+| **UX Journey** | Tomas Herrera (INTJ-A) | Journey maps, touchpoints, emotional arcs | Validated Personas | Journey Maps | `{agent.output}` |
+| **Question Interviewer (PjM)** | Rafael Mori (ENFJ-T) | Question consolidation, user interviews, answer distribution | Agent Question Log MARKs | Interview Transcripts | `{agent.output}` |
 
 **Execution order**: UX Persona -> UX Journey (chained via Step 6). Question Interviewer is triggered on-demand via `/collect-questions` when agents have open questions.
 
@@ -205,16 +204,18 @@ Legacy agents use traditional role-based prompting without the 5-Phase Relay. Th
 ### Agent Step Pattern (template for all CODE agents)
 
 ```markdown
+**Load role**: Read agent's configured role file (from .claude/settings.json)
+
 ### Steps
 1. **Define objective for agent** with `rehydrate-context` -> [domain input]. Gate: ...
 2. **Generate unfiltered Island Backlog** with `autonomous-capture` -- hunt for: [targets]. Gate: ...
 3. **Map, group, and sequence the Island Backlog** with `strategic-organize` -- [clustering]. Gate: ...
 4. **Distill each island into a concrete result** with `expert-distill` -- produce [artifacts]. Gate: ...
-5. **Update MARK files and emit** relay with `express-relay` -- write to outputagent/. Gate: ...
-6. (Optional) **Chain to next agent** -- invoke [next-agent] passing [data folder]. Gate: ...
+5. **Update MARK files and emit** relay with `express-relay` -- write to agent's configured output folder. Gate: ...
+6. (Optional) **Chain to next agent** -- invoke [next-agent] passing agent output folder. Gate: ...
 ```
 
-Each step inlines its **domain lens** (what to look for), **gate criteria** (must pass to proceed), and **domain-specific instructions** (quality bar, templates to use).
+Identity, Mandate, and Facts & Directives live in the agent's `ROLE.md` file (loaded at session start). Each step inlines its **domain lens** (what to look for), **gate criteria** (must pass to proceed), and **domain-specific instructions** (quality bar, templates to use).
 
 ### Trigger Phrase Contract
 
@@ -274,7 +275,7 @@ CODE skills follow a structured contract format:
 
 ### What are MARK files?
 
-MARK files are the **single source of truth** for cross-session continuity. Each agent has two MARK files in its `context/` folder:
+MARK files are the **single source of truth** for cross-session continuity. Each agent has two MARK files stored in `{paths.marks}` (from `.claude/settings.json`):
 
 | File | Purpose | Updated When |
 |------|---------|-------------|
@@ -352,10 +353,10 @@ Session N-1                  Session N                    Session N+1
 Agents can invoke the next agent in a pipeline via an optional Step 6. The chain passes a data folder path:
 
 ```
-UX Persona (Step 6) ──passes outputagent/personas/──▶ UX Journey (Step 1)
+UX Persona (Step 6) ──passes agent's configured output folder──▶ UX Journey (Step 1)
 ```
 
-UX Journey's Step 1 **validates** that personas exist before proceeding. If `outputagent/personas/` is empty, it halts with an error.
+UX Journey's Step 1 **validates** that personas exist before proceeding. If the ux-persona output folder is empty, it halts with an error.
 
 ### System Relay (cross-agent handoff)
 
@@ -387,7 +388,7 @@ When agents disagree, authority is resolved by domain ownership:
 | Scope and priority | Product Owner |
 | Technical approach | Architect |
 
-All conflict resolutions are logged as ADRs in `outputagent/decisions/`.
+All conflict resolutions are logged as ADRs in `{paths.decisions}` (from `.claude/settings.json`).
 
 ### Cross-Agent Data Bridges
 
@@ -416,7 +417,7 @@ Question Interviewer (PjM) activates:
   Phase 2 → builds Island Backlog from all OPEN questions
   Phase 3 → deduplicates, groups by theme, Hard blockers first
   Phase 4 → interviews user, writes answers back to each agent's MARK
-  Phase 5 → writes transcript to outputagent/meetings/
+  Phase 5 → writes transcript to agent's configured output folder
   Step 6  → emits /answers-ready agent-x agent-y
 
 User runs: /answers-ready agent-x agent-y
@@ -438,6 +439,7 @@ project-root/
 │   ├── settings.local.json                # Local permission overrides
 │   │
 │   ├── commands/                          # Slash commands (user-invocable)
+│   │   ├── ux-research-cycle.md           # Full UX cycle: Personas → Journeys → Interview → Iterate
 │   │   ├── team-planning.md               # Multi-agent planning orchestration
 │   │   ├── capture-decision.md            # ADR capture utility
 │   │   ├── collect-questions.md           # Trigger question interview
@@ -450,32 +452,33 @@ project-root/
 │   │   ├── ux-persona/                    # CODE-upgraded
 │   │   │   ├── AGENT.md                   # Agent definition (<=60 lines)
 │   │   │   └── context/
-│   │   │       ├── UX_Progress_Summary_MARK.md
-│   │   │       ├── UX_Questions_Log_MARK.md
+│   │   │       ├── ROLE.md                      # Identity + Mandate + Facts & Directives
 │   │   │       ├── persona-card-template.md    # Output template
 │   │   │       └── persona-patterns.md         # Archetype reference
 │   │   │
 │   │   ├── ux-journey/                    # CODE-upgraded
 │   │   │   ├── AGENT.md
 │   │   │   └── context/
-│   │   │       ├── JRN_Progress_Summary_MARK.md
-│   │   │       ├── JRN_Questions_Log_MARK.md
+│   │   │       ├── ROLE.md                      # Identity + Mandate + Facts & Directives
 │   │   │       └── journey-map-template.md
 │   │   │
 │   │   ├── product-owner/                 # Legacy
 │   │   │   ├── AGENT.md
-│   │   │   └── context/ (vision.md, backlog.md, stakeholders.md)
+│   │   │   └── context/
+│   │   │       ├── ROLE.md                      # Identity + Mandate + Facts & Directives
+│   │   │       └── (vision.md, backlog.md, stakeholders.md)
 │   │   │
-│   │   ├── project-manager/               # CODE-upgraded
+│   │   ├── question-interviewer/          # CODE-upgraded
 │   │   │   ├── AGENT.md                   # Agent OS (6 steps — Question Interviewer)
 │   │   │   └── context/
-│   │   │       ├── PJM_Progress_Summary_MARK.md
-│   │   │       ├── PJM_Questions_Log_MARK.md
+│   │   │       ├── ROLE.md                      # Identity + Mandate + Facts & Directives
 │   │   │       └── question-interview-template.md
 │   │   │
 │   │   ├── architect/                     # Legacy
 │   │   │   ├── AGENT.md
-│   │   │   └── context/ (architecture.md, constraints.md, tech-stack.md)
+│   │   │   └── context/
+│   │   │       ├── ROLE.md                      # Identity + Mandate + Facts & Directives
+│   │   │       └── (architecture.md, constraints.md, tech-stack.md)
 │   │   │
 │   │   ├── _shared/
 │   │   │   ├── protocols.md               # Handoffs, conflicts, quality standards
@@ -500,16 +503,17 @@ project-root/
 │       └── _templates/
 │           └── SKILL-TEMPLATE.md          # Blueprint for new skills
 │
-└── outputagent/                           # All generated artifacts
-    ├── personas/                          # Persona cards
-    ├── journeys/                          # Journey maps
-    ├── decisions/                         # ADRs
+└── outputs/                               # All generated artifacts ({paths.outputs})
+    ├── personas/                          # Persona cards ({agent.output} for ux-persona)
+    ├── journeys/                          # Journey maps ({agent.output} for ux-journey)
+    ├── decisions/                         # ADRs ({paths.decisions})
     ├── architecture/                      # Architecture docs
     ├── plans/                             # Project plans
     ├── risks/                             # Risk registers
     ├── status/                            # Status reports
     ├── meetings/                          # Meeting notes
-    └── lessons/                           # Lessons learned
+    ├── lessons/                           # Lessons learned
+    └── contextAgent/                      # MARK files ({paths.marks})
 ```
 
 ---
@@ -519,12 +523,12 @@ project-root/
 ### Creating a New Agent
 
 1. Copy `.claude/agents/_templates/AGENT-TEMPLATE.md`
-2. Fill in Identity (persona name, MBTI, role), Authority/Boundary, Mandate
+2. Create `context/ROLE.md` with Identity table, Mandate, and Facts & Directives
 3. Write 5 Steps using trigger phrases that match skill descriptions
 4. Add domain-specific lens and gate criteria to each step
-5. Create `context/` folder with seeded MARK files (use templates from `rehydrate-context/templates/`)
-6. Create output template(s) for Phase 4 artifacts
-7. Register in `.claude/settings.json`
+5. Create `context/` output template(s) for Phase 4 artifacts
+6. Seed MARK files in `{paths.marks}` (use templates from AGENT-TEMPLATE.md)
+7. Register in `.claude/settings.json` (file, prefix, output, template, role)
 8. Target: <=60 lines for AGENT.md
 
 ### Creating a New Skill
@@ -549,6 +553,7 @@ project-root/
 
 | Command | Purpose | Agents Involved |
 |---------|---------|-----------------|
+| `/ux-research-cycle [product]` | Full UX cycle: Personas → Journeys → Interview → Iterate/Finish | UX Persona → UX Journey → Question Interviewer |
 | `/team-planning [topic]` | Full collaborative planning session | PO -> Architect -> PjM (synthesize) |
 | `/collect-questions [agents]` | Consolidate cross-agent questions and interview user | Question Interviewer (PjM) |
 | `/answers-ready [agents]` | Notify agents that answers are in their MARK files | All receiving agents |
@@ -561,7 +566,7 @@ project-root/
 
 ## Output Taxonomy
 
-All agent output is written to `outputagent/` with a consistent folder structure:
+All agent output is written to `{paths.outputs}` (from `.claude/settings.json`) with a consistent folder structure:
 
 | Folder | Contents | Written By |
 |--------|----------|-----------|
@@ -617,7 +622,7 @@ Each agent has explicit Authority (what they own) and Boundary (what they do NOT
    - Set authority boundaries
    - Write 5 Steps with domain-specific lenses and gates
    - Create output templates for your domain (data schemas, campaign briefs, contract reviews, etc.)
-3. **Define your output taxonomy** -- create folders under `outputagent/` for your domain artifacts
+3. **Define your output taxonomy** -- create folders under `{paths.outputs}` for your domain artifacts
 4. **Set up chaining** if agents have pipeline dependencies (like Persona -> Journey)
 
 ### For a different AI platform
@@ -627,7 +632,7 @@ The architecture is platform-agnostic in concept. To port:
 - **Skills** = reusable prompt templates with pre/post-conditions
 - **MARK files** = any persistent key-value store or file system
 - **Trigger phrases** = function/tool dispatch mechanism
-- **outputagent/** = any shared artifact store
+- **outputs/** = any shared artifact store
 
 The key patterns to preserve:
 1. The 5-phase sequential relay
