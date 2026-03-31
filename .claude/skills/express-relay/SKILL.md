@@ -16,6 +16,8 @@ description: Update MARK files and emit System Relay.
    - Token Usage (estimated input tokens, output tokens, total, % of 5-hour Pro budget)
    - Artifacts Modified (paths + change types)
 
+   **Note**: The full cumulative history of distillation work lives in `{paths.marks}/{prefix}_Distill_History_MARK.md` (managed by Phase 4 — `expert-distill`). The Progress Summary MARK captures only THIS session's accomplishments. The Distill History Log captures ALL runs across ALL sessions. Do NOT duplicate the Distill History here — reference it.
+
 3. **Update** the agent's Questions Log MARK at `{paths.marks}/{prefix}_Questions_Log_MARK.md`:
    - RESOLVED questions → move to Resolved section with detail
    - OBSOLETE questions → move with reason
@@ -40,7 +42,7 @@ description: Update MARK files and emit System Relay.
 
 ### MARK File Contract
 
-Paths resolve from `.claude/settings.json`: `{paths.marks}/{prefix}_Progress_Summary_MARK.md` and `{paths.marks}/{prefix}_Questions_Log_MARK.md`. Session N-1 Phase 5 WRITES → Session N Phase 1 READS → Session N Phase 5 WRITES → Session N+1 reads.
+Paths resolve from `.claude/settings.json`: `{paths.marks}/{prefix}_Progress_Summary_MARK.md`, `{paths.marks}/{prefix}_Questions_Log_MARK.md`, and `{paths.marks}/{prefix}_Distill_History_MARK.md`. Session N-1 Phase 5 WRITES → Session N Phase 1 READS → Session N Phase 5 WRITES → Session N+1 reads. The Distill History MARK is append-only (managed by Phase 4, not Phase 5).
 
 **Invariants:**
 - MARK files are ALWAYS updated at session end, even for short or interrupted sessions.

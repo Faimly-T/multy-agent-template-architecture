@@ -41,6 +41,21 @@
       "output": "outputs/architecture",
       "template": null,
       "role": "agents/architect/context/ROLE.md"
+    },
+    "ux-orchestrator": {
+      "file": "agents/ux-orchestrator/AGENT.md",
+      "prefix": "UXORCH",
+      "output": "outputs/status",
+      "template": null,
+      "role": "agents/ux-orchestrator/context/ROLE.md",
+      "type": "orchestrator",
+      "childAgents": ["ux-persona", "ux-journey", "question-interviewer"],
+      "triggers": {
+        "new-scope": "commands/{child}/new-scope.md",
+        "iterate": "commands/{child}/iterate.md",
+        "redesign": "commands/{child}/redesign.md",
+        "collect": "commands/{child}/collect.md"
+      }
     }
   },
   "skills": {
@@ -53,7 +68,11 @@
     "backlog-management": "skills/backlog-management/SKILL.md",
     "risk-assessment": "skills/risk-assessment/SKILL.md",
     "architecture-design": "skills/architecture-design/SKILL.md",
-    "knowledge-capture": "skills/knowledge-capture/SKILL.md"
+    "knowledge-capture": "skills/knowledge-capture/SKILL.md",
+    "orch-clarify": "skills/orch-clarify/SKILL.md",
+    "orch-state-track": "skills/orch-state-track/SKILL.md",
+    "orch-response-cycle": "skills/orch-response-cycle/SKILL.md",
+    "orch-termination": "skills/orch-termination/SKILL.md"
   },
   "chainOrder": ["ux-persona", "ux-journey"],
   "authority": {
@@ -61,6 +80,7 @@
     "journeys": "ux-journey",
     "scope": "product-owner",
     "technical": "architect",
-    "questions": "question-interviewer"
+    "questions": "question-interviewer",
+    "ux-research-workflow": "ux-orchestrator"
   }
 }

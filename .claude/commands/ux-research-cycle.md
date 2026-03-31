@@ -1,4 +1,6 @@
-# UX Research Cycle
+# UX Research Cycle (Legacy)
+
+> **Deprecated** — Prefer `/ux-research-orchestrator` which uses the 7-Skill Relay orchestrator pattern with intent classification, conditional triggers, and state tracking.
 
 Run the full UX research workflow: Personas → Journeys → Question Interview → optional iteration.
 

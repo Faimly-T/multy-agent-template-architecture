@@ -39,6 +39,7 @@ All paths are centralized in `.claude/settings.json`. No hardcoded paths in agen
 | `{agent.role}` | Agent's ROLE.md file | `settings.json → agents.[name].role` |
 
 **MARK files**: `{paths.marks}/{agent.prefix}_Progress_Summary_MARK.md`
+**Distill History**: `{paths.marks}/{agent.prefix}_Distill_History_MARK.md`
 **Artifacts**: `{agent.output}/{filename}.md`
 **Decisions**: `{paths.decisions}/ADR-XXX-{title}.md`
 **Roles**: `{agent.role}` (Identity + Mandate + Facts & Directives)
@@ -56,6 +57,17 @@ All paths are centralized in `.claude/settings.json`. No hardcoded paths in agen
 | **Question Interviewer (PjM)** | `.claude/agents/question-interviewer/AGENT.md` | Question consolidation, user interviews, answer distribution | `{agent.output}` |
 
 **Execution order**: UX Persona → UX Journey (Persona Step 6 chains to Journey automatically). Journey Step 1 validates that personas exist before proceeding. Question Interviewer is triggered on-demand via `/collect-questions` when agents have open questions.
+
+### Orchestrator Agents
+
+Orchestrator agents govern workflow — they classify intent, fire triggers to child agents, and manage completion cycles. They do NOT produce domain artifacts. They follow a **7-Skill Relay** instead of the CODE 5-Phase Relay.
+
+| Agent | File | Child Agents | Writes To |
+|-------|------|-------------|----------|
+| **UX Research Orchestrator** | `.claude/agents/ux-orchestrator/AGENT.md` | ux-persona, ux-journey, question-interviewer | `{paths.marks}/UXORCH_Orchestration_State_MARK.md` |
+
+**Template**: `.claude/agents/_templates/ORCHESTRATOR-TEMPLATE.md`
+**Trigger files**: `.claude/commands/[child-agent]/[trigger-type].md` — loaded and fired by the orchestrator in Step 4.
 
 ### Legacy (not yet CODE-upgraded)
 
@@ -77,6 +89,15 @@ Skills are lazy-loaded — agents read each skill file ONLY when entering that s
 | `strategic-organize` | `.claude/skills/strategic-organize/SKILL.md` | "Map, group, and sequence the Island Backlog" |
 | `expert-distill` | `.claude/skills/expert-distill/SKILL.md` | "Distill each island into a concrete result" |
 | `express-relay` | `.claude/skills/express-relay/SKILL.md` | "Update MARK files and emit" |
+
+### Orchestrator skills (shared by orchestrator agents)
+
+| Skill | File | Trigger Phrase (in orchestrator Steps) |
+|-------|------|-----------------------------------------|
+| `orch-clarify` | `.claude/skills/orch-clarify/SKILL.md` | "Clarify classification ambiguity" |
+| `orch-state-track` | `.claude/skills/orch-state-track/SKILL.md` | "Record orchestration state" |
+| `orch-response-cycle` | `.claude/skills/orch-response-cycle/SKILL.md` | "Monitor child agent completion" |
+| `orch-termination` | `.claude/skills/orch-termination/SKILL.md` | "Enforce termination conditions" |
 
 ### How trigger phrases work
 
@@ -104,6 +125,25 @@ Every CODE-upgraded agent follows this structure in `AGENT.md`:
 
 Identity, Mandate, and Facts & Directives live in the agent's `ROLE.md` file (loaded at session start). Each step inlines its domain lens — no separate sections needed.
 
+## Orchestrator Step Pattern
+
+Every orchestrator agent follows this structure in `AGENT.md`:
+
+```
+**Load role**: Read agent's configured role file (from .claude/settings.json)
+
+### Steps
+1. **Receive and preserve input** — [domain-specific parsing]. Gate: Full input captured
+2. **Classify intent against matrix** — apply [classification matrix]. Gate: Single type confirmed
+3. **Clarify classification ambiguity** with `orch-clarify` — only when needed. Gate: Classification resolved
+4. **Fire triggers to child agents** — load command files, inject payload, fire per [execution order]. Gate: All triggers fired
+5. **Record orchestration state** with `orch-state-track`. Gate: State MARK updated
+6. **Monitor child agent completion** with `orch-response-cycle`. Gate: All children at terminal status
+7. **Enforce termination conditions** with `orch-termination`. Gate: Cycle COMPLETE or HELD
+```
+
+Skills 1, 2, 4 are customized per instance (classification matrix, child agents, trigger paths). Skills 3, 5, 6, 7 are shared identically across all orchestrators.
+
 ---
 
 ## Persistence
@@ -112,8 +152,18 @@ Identity, Mandate, and Facts & Directives live in the agent's `ROLE.md` file (lo
 Each agent's MARK files live in `{paths.marks}` — path configured in `.claude/settings.json`:
 - `{prefix}_Progress_Summary_MARK.md` — accomplishments, open threads, momentum, **token usage**
 - `{prefix}_Questions_Log_MARK.md` — open/resolved/obsolete questions
+- `{prefix}_Distill_History_MARK.md` — **append-only** cumulative log of all distillation runs, including islands processed, decisions made per island, artifacts produced, and run summaries across all sessions
 
-Written at every session end (Step 5). Read at every session start (Step 1).
+Progress Summary and Questions Log: written at every session end (Step 5). Read at every session start (Step 1).
+Distill History: appended during Phase 4 (`expert-distill`). Read at session start (Step 1) and Phase 4 start for full prior-work context.
+
+### Orchestration State MARK (orchestrator agents)
+Orchestrators use `{paths.marks}/{prefix}_Orchestration_State_MARK.md` instead of a Progress Summary MARK:
+- Active Cycle (classification type, triggered agents, timestamps, execution order)
+- Child Agent Status table (agent, trigger file, status, expected output, completion)
+- Open Blockers
+- Cycle History
+- Token Usage
 
 ### Token Monitoring
 Every Progress Summary MARK includes a Token Usage table:
@@ -143,12 +193,23 @@ Every Progress Summary MARK includes a Token Usage table:
 CLAUDE.md                          # ← You are here. Framework reference.
 .claude/
   settings.json                    # Central config (paths, agents, skills, authority)
-  commands/                        # Slash commands
-    ux-research-cycle.md           # Full UX cycle: Personas → Journeys → Interview → Iterate
+  commands/                        # Slash commands + orchestrator triggers
+    ux-research-cycle.md           # Full UX cycle (legacy — deprecated, prefer /ux-research-orchestrator)
+    ux-research-orchestrator.md     # Trigger UX Research Orchestrator (preferred entry point)
     team-planning.md               # Multi-agent planning session
     capture-decision.md            # ADR capture
     collect-questions.md           # Trigger question interview
     answers-ready.md               # Notify agents answers are ready
+    ux-persona/                    # Trigger commands for ux-persona (fired by orchestrator)
+      new-scope.md                 # Type 1: New Requirement trigger
+      iterate.md                   # Type 2: Iteration trigger
+      redesign.md                  # Type 3: Scope Change trigger
+    ux-journey/                    # Trigger commands for ux-journey (fired by orchestrator)
+      new-scope.md                 # Type 1: New Requirement trigger
+      iterate.md                   # Type 2: Iteration trigger
+      redesign.md                  # Type 3: Scope Change trigger
+    question-interviewer/          # Trigger commands for question-interviewer (fired by orchestrator)
+      collect.md                   # Conditional: collect & resolve open questions
   agents/
     ux-persona/                    # CODE-upgraded
       AGENT.md                     # Agent OS (6 steps)
@@ -176,8 +237,13 @@ CLAUDE.md                          # ← You are here. Framework reference.
         ROLE.md                    # Identity + Mandate + Facts & Directives
     _shared/
       protocols.md                 # Shared protocols (handoffs, conflict, quality)
+    ux-orchestrator/               # Orchestrator agent
+      AGENT.md                     # Orchestrator OS (7 steps)
+      context/
+        ROLE.md                    # Identity + Mandate + Facts & Directives
     _templates/
       AGENT-TEMPLATE.md            # Template for new CODE agents
+      ORCHESTRATOR-TEMPLATE.md     # Template for new orchestrator agents
   skills/
     rehydrate-context/SKILL.md     # Step 1: Session boot
     autonomous-capture/SKILL.md    # Step 2: Divergent capture
@@ -190,6 +256,10 @@ CLAUDE.md                          # ← You are here. Framework reference.
     risk-assessment/               # Legacy skill
     architecture-design/           # Legacy skill
     knowledge-capture/             # Legacy skill
+    orch-clarify/SKILL.md          # Orchestrator: Clarification
+    orch-state-track/SKILL.md      # Orchestrator: State tracking
+    orch-response-cycle/SKILL.md   # Orchestrator: Completion monitoring
+    orch-termination/SKILL.md      # Orchestrator: Termination enforcement
 outputs/                           # All generated artifacts ({paths.outputs})
   personas/                        # Persona cards ({agent.output} for ux-persona)
   journeys/                        # Journey maps ({agent.output} for ux-journey)
@@ -203,6 +273,8 @@ outputs/                           # All generated artifacts ({paths.outputs})
   contextAgent/                    # MARK files ({paths.marks})
     {prefix}_Progress_Summary_MARK.md
     {prefix}_Questions_Log_MARK.md
+    {prefix}_Distill_History_MARK.md        # Append-only distill run history (all agents)
+    {prefix}_Orchestration_State_MARK.md  # Orchestrator state (orchestrators only)
 ```
 
 ---
@@ -212,7 +284,7 @@ outputs/                           # All generated artifacts ({paths.outputs})
 ### Run an agent
 Invoke by name in VS Code Copilot Chat. The agent reads its AGENT.md and follows the Steps.
 
-### Build a new agent
+### Build a new worker agent
 1. Copy `.claude/agents/_templates/AGENT-TEMPLATE.md`
 2. Create `context/ROLE.md` with Identity table, Mandate, and Facts & Directives
 3. Fill in 5 Steps with domain lenses and gates in AGENT.md
@@ -220,8 +292,17 @@ Invoke by name in VS Code Copilot Chat. The agent reads its AGENT.md and follows
 5. Register in `.claude/settings.json` (file, prefix, output, template, role)
 6. Target: ≤60 lines for AGENT.md
 
+### Build a new orchestrator agent
+1. Copy `.claude/agents/_templates/ORCHESTRATOR-TEMPLATE.md`
+2. Create `context/ROLE.md` with orchestrator identity (authority = workflow governance)
+3. Fill in Steps 1, 2, 4 with domain-specific classification matrix, child agents, trigger paths, execution order
+4. Create trigger command files at `.claude/commands/[child-agent]/[trigger-type].md` for each child × type combination
+5. Seed an Orchestration State MARK in `{paths.marks}`
+6. Register in `.claude/settings.json` with: file, prefix, output, role, type: "orchestrator", childAgents, triggers
+7. Target: ≤60 lines for AGENT.md, ~3% of Claude Pro 5-hour window per orchestrator run
+
 ### Token budget
-Target ~5% of Claude Pro 5-hour window per agent run. Token usage is tracked in each agent's Progress Summary MARK.
+Target ~5% of Claude Pro 5-hour window per worker agent run, ~3% per orchestrator run. Token usage is tracked in each agent's Progress Summary MARK or Orchestration State MARK.
 
 ---
 
@@ -232,3 +313,5 @@ Target ~5% of Claude Pro 5-hour window per agent run. Token usage is tracked in 
 - All decisions logged in `{paths.decisions}`
 - Progressive Summarization on all artifacts (bold key passages, highlight critical takeaways)
 - MARK files are the single source of truth for cross-session continuity
+- Orchestrator agents use `ORCHESTRATOR-TEMPLATE.md` and the 7-Skill Relay (not the CODE 5-Phase)
+- Trigger command files live in `.claude/commands/[child-agent]/[trigger-type].md`

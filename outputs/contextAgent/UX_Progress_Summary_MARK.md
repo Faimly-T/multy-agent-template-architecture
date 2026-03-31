@@ -7,57 +7,46 @@
 ## Last Checkpoint
 | Field | Value |
 |-------|-------|
-| **Date** | 2026-03-30 |
-| **Session** | #1 (Initial) |
-| **Objective** | Define validated user personas for Catch MVP Stage 1 — AI-driven scholarship engagement engine with 3 modules (CSI, Home Viewer, Profiling AI OS) |
+| **Date** | 2026-03-31 |
+| **Session** | #2 (Iteration — PjM answers integrated) |
+| **Objective** | Refine and produce all persona artifact files incorporating 7 resolved questions from PjM Interview Session #1 |
 
 ## What Was Accomplished
-- **5 persona artifacts produced**:
-  - **Jaylen — The Prospect** (Primary): Student-athlete, mobile-native, passive content consumer, scholarship-seeker. Full persona card with JTBD, behavioral patterns, emotional journey, scenario, design implications.
-  - **Ivan — The Curator-Scout** (Secondary): Catch Strategist, desktop power user, batch-process curator of content tags + Scout Sheet consumer. Full persona card.
-  - **Derek — The Tourist** (Anti-Persona): Entertainment-only user who pollutes the profiling pipeline with false-positive signals.
-  - **Linda — The Helicopter Parent** (Anti-Persona): Proxy engagement user who corrupts athlete profiles with parental aspiration data.
-  - **Tertiary Stakeholders Summary**: Coach, Parent/Guardian (supportive), University Recruiter — documented for future stages.
-- **2 decisions resolved inline**:
-  - ISL-023: Single student-athlete persona for MVP (sport/position as attribute, not separate personas)
-  - ISL-030: Single Strategist persona for MVP (Ivan plays both Curator and Scout roles in Stage 1)
-- **32 islands captured** → 27 after dedup → 22 processed → all resolved
+- **5 persona artifacts produced** (files now exist on disk):
+  - `outputs/personas/01-student-athlete-the-prospect.md` — Jaylen (Primary). Updated with: Discovery Dashboard (partial profile visibility at 70% confidence), parental consent gate (under-18), Colombia → USA scope, football-only, dual-track recruitment window (individual + class year), minimal engagement guardrails.
+  - `outputs/personas/02-strategist-the-curator-scout.md` — Ivan (Secondary). Updated with: daily batch confirmed, AI safety filter post-tag-approval, AI confidence scores visible, Colombia market context.
+  - `outputs/personas/03-anti-persona-the-tourist.md` — Derek. Refined with engagement quality signal guidance for AI pipeline.
+  - `outputs/personas/04-anti-persona-helicopter-parent.md` — Linda. Refined with parental consent flow as legitimate separation mechanism; proxy detection signals.
+  - `outputs/personas/05-tertiary-stakeholders-summary.md` — Coach, Parent/Guardian (supportive), University Recruiter. Updated with parental consent gate and Stage 2 conversion role.
+- All 7 open questions (UX-Q001 through UX-Q007) fully integrated into persona cards.
 
 ## Where We Stopped
-- All islands processed. **Full completion.**
-- No remaining work items in the Execution Roadmap.
+- All persona files written. **Full completion for Session #2.**
+- No remaining work items.
 
 ## Open Threads
-| ID | Thread | Next Action | Priority |
-|----|--------|-------------|----------|
-| ISL-017 | Does a student-athlete ever see their own profile/Reality Match? | UX Journey agent or PO to clarify | P2 |
-| ISL-018 | Is the 3-to-5 year window per student or per cohort? | PO to scope | P3 |
-| ISL-019 | Sports scope (football-only or multi-sport)? | PO to confirm. Assumed football-primary. | P3 |
-| ISL-020 | Geographic scope of student-athletes? | PO to confirm. Assumed global-to-US pipeline. | P3 |
-| ISL-027 | Existing user research or market data? | Stakeholder to provide. Personas are assumption-based. | P2 |
-| ISL-021 | COPPA/FERPA compliance for profiling minors | Architect + Legal to assess | P1 |
-| ISL-031 | Responsible engagement design (dopamine-first + minors) | PO + UX to define guardrails | P1 |
+_None — all questions resolved. See UX_Questions_Log_MARK.md._
 
 ## Momentum Direction
 | Field | Value |
 |-------|-------|
-| **Heading** | Personas complete → Ready for UX Journey mapping |
-| **Recommended Next Focus** | Map the student-athlete journey through the Home Viewer engagement loop, and the Strategist journey through CSI → Scout Sheet workflow |
-| **Confidence** | **High** — comprehensive brief provided strong material for persona definition |
+| **Heading** | Personas v2 complete → Journey maps iterated → Ready for PO + Architect agents |
+| **Recommended Next Focus** | Proceed to `/team-planning` — activate Product Owner (backlog + user stories) and Architect (technical architecture, consent flows, two-view API design) |
+| **Confidence** | **High** — all scope questions resolved; personas grounded in confirmed product decisions |
 
 ## Token Usage
 | Metric | Value |
 |--------|-------|
-| Input tokens | ~8,000 (est.) |
-| Output tokens | ~12,000 (est.) |
-| Total tokens | ~20,000 (est.) |
-| Est. % of 5h Pro budget | ~2% |
+| Input tokens | ~6,000 (est.) |
+| Output tokens | ~10,000 (est.) |
+| Total tokens | ~16,000 (est.) |
+| Est. % of 5h Pro budget | ~1.6% |
 
 ## Artifacts Modified
 | Path | Change Type |
 |------|-------------|
-| `outputs/personas/01-student-athlete-the-prospect.md` | CREATED |
-| `outputs/personas/02-strategist-the-curator-scout.md` | CREATED |
-| `outputs/personas/03-anti-persona-the-tourist.md` | CREATED |
-| `outputs/personas/04-anti-persona-helicopter-parent.md` | CREATED |
-| `outputs/personas/05-tertiary-stakeholders-summary.md` | CREATED |
+| `outputs/personas/01-student-athlete-the-prospect.md` | CREATED (v2) |
+| `outputs/personas/02-strategist-the-curator-scout.md` | CREATED (v2) |
+| `outputs/personas/03-anti-persona-the-tourist.md` | CREATED (v2) |
+| `outputs/personas/04-anti-persona-helicopter-parent.md` | CREATED (v2) |
+| `outputs/personas/05-tertiary-stakeholders-summary.md` | CREATED (v2) |
