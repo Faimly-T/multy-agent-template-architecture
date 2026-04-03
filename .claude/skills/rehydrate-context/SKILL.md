@@ -3,7 +3,7 @@ name: rehydrate-context
 description: Define objective for agent and reconstruct session from MARK files.
 ---
 
-### Steps
+# Steps
 
 1. **Read** the agent's Progress Summary MARK at `{paths.marks}/{prefix}_Progress_Summary_MARK.md` (resolve `paths.marks` and `prefix` from `.claude/settings.json`) — extract Last Checkpoint, Open Threads, Momentum Direction, Artifacts Modified.
 
@@ -40,7 +40,7 @@ description: Define objective for agent and reconstruct session from MARK files.
 
 11. **Emit** Session Objective → **wait for user confirmation** before proceeding.
 
-### Errors
+# Errors
 | Condition | Response |
 |-----------|----------|
 | MARK missing/empty | "Initial Session" — skip Narrative Bridge, session #1 |

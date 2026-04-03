@@ -1,1 +1,4 @@
 outputs/**/*.md
+
+# Local settings with secrets
+appsettings.local.json
