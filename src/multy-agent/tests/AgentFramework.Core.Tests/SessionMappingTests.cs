@@ -1,6 +1,8 @@
+using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Core.Agent;
 using AgentFramework.Domain.UxAgent;
 
@@ -13,7 +15,7 @@ public class SessionMappingTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return UxPersonaFactory.Create(markdown);
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
     }
 
     // --- Step 1: Rehydrate → maps Session Objective ---
@@ -23,9 +25,10 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.Checkpoint.SessionObjective);
     }
@@ -37,12 +40,13 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("objective");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
         // Step 1
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
         // Step 2
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.Equal(3, agent.Session!.Islands.Count);
         Assert.Equal("ISL-001", agent.Session.Islands[0].Id);
@@ -55,10 +59,11 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("objective");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(executor);
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.Null(agent.Session!.Islands[0].RelatesToIslandId);
         Assert.Equal("ISL-001", agent.Session.Islands[2].RelatesToIslandId);
@@ -71,11 +76,12 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("objective");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(executor); // Step 1
-        await agent.ExecuteNextStepAsync(executor); // Step 2
-        await agent.ExecuteNextStepAsync(executor); // Step 3
+        await agent.ExecuteNextStepAsync(builder, client); // Step 1
+        await agent.ExecuteNextStepAsync(builder, client); // Step 2
+        await agent.ExecuteNextStepAsync(builder, client); // Step 3
 
         Assert.Equal(IslandStatus.Organized, agent.Session!.Islands[0].Status);
         Assert.Equal(IslandStatus.Organized, agent.Session.Islands[1].Status);
@@ -87,11 +93,12 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("objective");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(executor);
-        await agent.ExecuteNextStepAsync(executor);
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.Single(agent.Session!.Decisions);
         Assert.Equal("DEC-001", agent.Session.Decisions[0].Id);
@@ -105,12 +112,13 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("objective");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(executor); // 1
-        await agent.ExecuteNextStepAsync(executor); // 2
-        await agent.ExecuteNextStepAsync(executor); // 3
-        await agent.ExecuteNextStepAsync(executor); // 4
+        await agent.ExecuteNextStepAsync(builder, client); // 1
+        await agent.ExecuteNextStepAsync(builder, client); // 2
+        await agent.ExecuteNextStepAsync(builder, client); // 3
+        await agent.ExecuteNextStepAsync(builder, client); // 4
 
         Assert.Equal(IslandStatus.Distilled, agent.Session!.Islands[0].Status);
         Assert.Equal(IslandStatus.Distilled, agent.Session.Islands[1].Status);
@@ -120,16 +128,17 @@ public class SessionMappingTests
         Assert.Equal(DeliverableStatus.Complete, agent.Session.Deliverables[0].Status);
     }
 
-    // --- Step 5: Relay → maps token consumption ---
+    // --- Step 5: Express → maps token consumption ---
 
     [Fact]
-    public async Task Step5_RelayResult_MapsTokenConsumption()
+    public async Task Step5_ExpressResult_MapsTokenConsumption()
     {
         var agent = CreateAgent();
         agent.StartSession("objective");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteAllStepsAsync(executor);
+        await agent.ExecuteAllStepsAsync(builder, client);
 
         Assert.True(agent.IsCompleted);
         Assert.Equal(2000, agent.Session!.Checkpoint.TokensConsumption.InputTokens);
@@ -144,9 +153,10 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        var results = await agent.ExecuteAllStepsAsync(executor);
+        var results = await agent.ExecuteAllStepsAsync(builder, client);
 
         Assert.Equal(5, results.Count);
         Assert.True(agent.IsCompleted);
@@ -168,19 +178,20 @@ public class SessionMappingTests
     {
         var agent = CreateAgent();
         // No StartSession call
-        var executor = new PhaseAwareExecutor();
+        var builder = new UxStepMessageBuilder();
+        var client = new PhaseAwareChatClient();
 
-        var result = await agent.ExecuteNextStepAsync(executor);
+        var result = await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.True(result.GateSatisfied);
         Assert.Null(agent.Session);
     }
 
-    // --- Fake executor that returns typed results per step ---
+    // --- Fake chat client that returns typed results per step ---
 
-    private class PhaseAwareExecutor : IStepExecutor
+    private class PhaseAwareChatClient : IChatClient
     {
-        public Task<StepResult> ExecuteAsync(AgentStep step, Role role, CancellationToken ct = default)
+        public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
             StepResult result = step.StepNumber switch
             {
@@ -226,11 +237,12 @@ public class SessionMappingTests
                         new("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete),
                     }),
 
-                5 => new RelayResult(
-                    Output: "MARK files updated, relay emitted",
+                5 => new ExpressResult(
+                    Output: "Session state compiled, relay emitted",
                     GateSatisfied: true,
                     InputTokens: 2000,
-                    OutputTokens: 5000),
+                    OutputTokens: 5000,
+                    Questions: []),
 
                 _ => new StepResult($"Step {step.StepNumber}", true),
             };

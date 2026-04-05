@@ -3,6 +3,7 @@ using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
@@ -14,7 +15,13 @@ public class SkillConversationTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return UxPersonaFactory.Create(markdown);
+        var skills = TestSteps.DefaultSteps()
+            .Select(s => Skill.FromMd(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
+        var steps = UxStepBuilder.Create()
+            .WithSteps(TestSteps.DefaultSteps())
+            .WithSkills(skills)
+            .Build();
+        return new UxPersona(Role.FromMd(markdown), steps);
     }
 
     // --- Skill loading ---
@@ -22,31 +29,19 @@ public class SkillConversationTests
     [Fact]
     public void Skill_FromMd_ParsesNameAndDescription()
     {
-        var md = """
-            ---
-            name: rehydrate-context
-            description: Define objective for agent and reconstruct session from MARK files.
-            ---
-
-            # Steps
-            1. Read the Progress Summary MARK.
-            2. Synthesize objective.
-            """;
+        var md = File.ReadAllText("TestData/Skills/rehydrate-context.md");
 
         var skill = Skill.FromMd(md);
 
         Assert.Equal("rehydrate-context", skill.Name);
-        Assert.Equal("Define objective for agent and reconstruct session from MARK files.", skill.Description);
-        Assert.Contains("Read the Progress Summary MARK", skill.Instructions);
+        Assert.Equal("Define objective for agent and reconstruct session from prior state.", skill.Description);
+        Assert.Contains("session checkpoint", skill.Instructions);
     }
 
     [Fact]
-    public async Task LoadSkills_AttachesSkillToEachStep()
+    public void WithSkill_AttachesSkillToStep()
     {
         var agent = CreateAgent();
-        var provider = new FakeSkillProvider();
-
-        await agent.LoadSkillsAsync(provider);
 
         Assert.All(agent.Steps, step => Assert.NotNull(step.Skill));
         Assert.Equal("rehydrate-context", agent.Steps[0].Skill!.Name);
@@ -57,10 +52,13 @@ public class SkillConversationTests
     }
 
     [Fact]
-    public async Task LoadSkills_PreservesStepNumbersAndGates()
+    public void AttachSkill_PreservesStepNumbersAndGates()
     {
         var agent = CreateAgent();
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
+        var markdownRehydrate = File.ReadAllText("TestData/Skills/rehydrate-context.md");
+
+        // Re-attach skill via internal AttachSkill — step number and gate are preserved
+        agent.Steps[0].AttachSkill(Skill.FromMd(markdownRehydrate));
 
         Assert.Equal(5, agent.Steps.Count);
         Assert.Equal(1, agent.Steps[0].StepNumber);
@@ -74,13 +72,12 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var userMsg = agent.Conversation.Messages.First(m => m.Role == MessageRole.User);
+        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
         Assert.Contains("sessionObjective", userMsg.Content);
         Assert.Contains("gateSatisfied", userMsg.Content);
         Assert.Contains("Required Response Format", userMsg.Content);
@@ -91,14 +88,13 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client); // step 1
         await agent.ExecuteNextStepAsync(builder, client); // step 2
 
-        var step2Msg = agent.Conversation.Messages
+        var step2Msg = agent.ConversationMessages
             .Where(m => m.Role == MessageRole.User)
             .Skip(1).First();
         Assert.Contains("islands", step2Msg.Content);
@@ -110,7 +106,6 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -118,7 +113,7 @@ public class SkillConversationTests
         await agent.ExecuteNextStepAsync(builder, client);
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var step3Msg = agent.Conversation.Messages
+        var step3Msg = agent.ConversationMessages
             .Where(m => m.Role == MessageRole.User)
             .Skip(2).First();
         Assert.Contains("organizedIslands", step3Msg.Content);
@@ -132,15 +127,15 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var userMsg = agent.Conversation.Messages.First(m => m.Role == MessageRole.User);
+        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
         Assert.Contains("Skill: rehydrate-context", userMsg.Content);
-        Assert.Contains("Read the Progress Summary MARK", userMsg.Content);
+        Assert.Contains("session checkpoint", userMsg.Content);
+        Assert.Contains("Synthesize Session Objective", userMsg.Content);
     }
 
     [Fact]
@@ -148,14 +143,14 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
+
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var step2Msg = agent.Conversation.Messages
+        var step2Msg = agent.ConversationMessages
             .Where(m => m.Role == MessageRole.User)
             .Skip(1).First();
         Assert.Contains("Skill: autonomous-capture", step2Msg.Content);
@@ -169,14 +164,13 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var step2Msg = agent.Conversation.Messages
+        var step2Msg = agent.ConversationMessages
             .Where(m => m.Role == MessageRole.User)
             .Skip(1).First();
         Assert.Contains("Build personas for college athletic recruiting platform", step2Msg.Content);
@@ -187,7 +181,6 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -195,7 +188,7 @@ public class SkillConversationTests
         await agent.ExecuteNextStepAsync(builder, client);
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var step3Msg = agent.Conversation.Messages
+        var step3Msg = agent.ConversationMessages
             .Where(m => m.Role == MessageRole.User)
             .Skip(2).First();
         Assert.Contains("ISL-001", step3Msg.Content);
@@ -209,13 +202,12 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var sysMsg = agent.Conversation.Messages.First(m => m.Role == MessageRole.System);
+        var sysMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.System);
         Assert.Contains("valid JSON", sysMsg.Content);
     }
 
@@ -226,7 +218,6 @@ public class SkillConversationTests
     {
         var agent = CreateAgent();
         agent.StartSession("placeholder");
-        await agent.LoadSkillsAsync(new FakeSkillProvider());
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -243,84 +234,6 @@ public class SkillConversationTests
 
     // --- Fakes ---
 
-    private class FakeSkillProvider : ISkillProvider
-    {
-        private static readonly Dictionary<string, string> SkillMds = new()
-        {
-            ["rehydrate-context"] = """
-                ---
-                name: rehydrate-context
-                description: Define objective for agent and reconstruct session from MARK files.
-                ---
-
-                # Steps
-                1. Read the Progress Summary MARK.
-                2. Parse user input.
-                3. Synthesize Session Objective with verb + deliverable + success condition + stakes.
-                """,
-
-            ["autonomous-capture"] = """
-                ---
-                name: autonomous-capture
-                description: Generate unfiltered Island Backlog from the Session Objective.
-                ---
-
-                ### Steps
-                1. Load Session Objective.
-                2. Pass 1 — Objective Decomposition: sub-deliverables, decisions, risks.
-                3. Pass 2 — Edge Exploration: adjacent concerns, assumptions.
-                4. Tag each island: WORK, DECISION, QUESTION, RISK, DEPENDENCY, PREREQUISITE.
-                5. Number sequentially: ISL-001, ISL-002, etc.
-                """,
-
-            ["strategic-organize"] = """
-                ---
-                name: strategic-organize
-                description: Map, group, and sequence the Island Backlog into an Execution Roadmap.
-                ---
-
-                ### Steps
-                1. Deduplicate.
-                2. Cluster into execution groups.
-                3. Sequence by dependency order.
-                4. Triage questions.
-                5. Emit Execution Roadmap.
-                """,
-
-            ["expert-distill"] = """
-                ---
-                name: expert-distill
-                description: Distill each island into a concrete result or formal concern.
-                ---
-
-                ### Steps
-                1. Load Distill History.
-                2. Resolve blocks first.
-                3. Process queue using Distill Lens.
-                4. Update Results Ledger.
-                """,
-
-            ["express-relay"] = """
-                ---
-                name: express-relay
-                description: Update MARK files and emit System Relay.
-                ---
-
-                ### Steps
-                1. Compile session state.
-                2. Overwrite Progress Summary MARK.
-                3. Update Questions Log MARK.
-                4. Emit System Relay.
-                """,
-        };
-
-        public Task<Skill> LoadAsync(string skillName, CancellationToken ct = default)
-        {
-            var md = SkillMds[skillName];
-            return Task.FromResult(Skill.FromMd(md));
-        }
-    }
-
     private class FakeChatClient : IChatClient
     {
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
@@ -328,9 +241,11 @@ public class SkillConversationTests
             StepResult result = step.StepNumber switch
             {
                 1 => new RehydrateResult(
-                    Output: """{"sessionObjective":"Build personas for college athletic recruiting platform","gateSatisfied":true}""",
+                    Output: """{"sessionObjective":"Build personas for college athletic recruiting platform","narrativeBridge":"Initial session — no prior context.","isInitialSession":true,"stalenessWarning":null,"blockers":[],"gateSatisfied":true}""",
                     GateSatisfied: true,
-                    SessionObjective: "Build personas for college athletic recruiting platform"),
+                    SessionObjective: "Build personas for college athletic recruiting platform",
+                    NarrativeBridge: "Initial session — no prior context.",
+                    IsInitialSession: true),
 
                 2 => new CaptureResult(
                     Output: """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete","source":"product desc"},{"id":"ISL-002","type":"Stakeholder","description":"College coach","source":"product desc"},{"id":"ISL-003","type":"PainPoint","description":"No visibility","source":"interview","relatesToIslandId":"ISL-001"}],"gateSatisfied":true}""",
@@ -363,11 +278,12 @@ public class SkillConversationTests
                     ],
                     Deliverables: [new("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)]),
 
-                5 => new RelayResult(
+                5 => new ExpressResult(
                     Output: """{"inputTokens":2000,"outputTokens":5000,"gateSatisfied":true}""",
                     GateSatisfied: true,
                     InputTokens: 2000,
-                    OutputTokens: 5000),
+                    OutputTokens: 5000,
+                    Questions: []),
 
                 _ => new StepResult($"Step {step.StepNumber}", true),
             };

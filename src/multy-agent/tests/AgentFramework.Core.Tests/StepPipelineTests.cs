@@ -1,7 +1,10 @@
 using AgentFramework.Core.Agent;
+using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
@@ -13,7 +16,7 @@ public class StepPipelineTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return UxPersonaFactory.Create(markdown);
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
     }
 
     [Fact]
@@ -61,9 +64,11 @@ public class StepPipelineTests
     public async Task ExecuteNextStep_RaisesStepStartedAndCompleted_WhenGatePasses()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: true);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: true);
 
-        var result = await agent.ExecuteNextStepAsync(executor);
+        var result = await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.True(result.GateSatisfied);
         Assert.Equal(1, agent.CurrentStepIndex);
@@ -76,9 +81,11 @@ public class StepPipelineTests
     public async Task ExecuteNextStep_RaisesStepGateFailed_WhenGateFails()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: false);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: false);
 
-        var result = await agent.ExecuteNextStepAsync(executor);
+        var result = await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.False(result.GateSatisfied);
         Assert.Equal(0, agent.CurrentStepIndex); // did not advance
@@ -91,9 +98,11 @@ public class StepPipelineTests
     public async Task ExecuteAllSteps_RunsAllSteps_WhenAllGatesPass()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: true);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: true);
 
-        var results = await agent.ExecuteAllStepsAsync(executor);
+        var results = await agent.ExecuteAllStepsAsync(builder, client);
 
         Assert.Equal(5, results.Count);
         Assert.True(agent.IsCompleted);
@@ -104,9 +113,11 @@ public class StepPipelineTests
     public async Task ExecuteAllSteps_StopsAtFailedGate()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(failAtStep: 3);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(failAtStep: 3);
 
-        var results = await agent.ExecuteAllStepsAsync(executor);
+        var results = await agent.ExecuteAllStepsAsync(builder, client);
 
         Assert.Equal(3, results.Count);
         Assert.False(agent.IsCompleted);
@@ -117,20 +128,24 @@ public class StepPipelineTests
     public async Task ExecuteNextStep_ThrowsWhenAllCompleted()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: true);
-        await agent.ExecuteAllStepsAsync(executor);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: true);
+        await agent.ExecuteAllStepsAsync(builder, client);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => agent.ExecuteNextStepAsync(executor));
+            () => agent.ExecuteNextStepAsync(builder, client));
     }
 
     [Fact]
     public async Task StepStarted_CarriesCorrectSkillName()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: true);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: true);
 
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         var started = (StepStarted)agent.DomainEvents[0];
         Assert.Equal("rehydrate-context", started.SkillName);
@@ -141,46 +156,96 @@ public class StepPipelineTests
     public async Task StepCompleted_CarriesResult()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: true);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: true);
 
-        await agent.ExecuteNextStepAsync(executor);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         var completed = (StepCompleted)agent.DomainEvents[1];
-        Assert.Equal("Fake output for step 1", completed.Result.Output);
+        Assert.Equal("Objective defined", completed.Result.Output);
     }
 
     [Fact]
     public async Task ClearDomainEvents_EmptiesTheList()
     {
         var agent = CreateAgent();
-        var executor = new FakeStepExecutor(gateSatisfied: true);
-        await agent.ExecuteNextStepAsync(executor);
+        agent.StartSession("placeholder");
+        var builder = new UxStepMessageBuilder();
+        var client = new FakeChatClient(gateSatisfied: true);
+        await agent.ExecuteNextStepAsync(builder, client);
 
         agent.ClearDomainEvents();
 
         Assert.Empty(agent.DomainEvents);
     }
 
-    private class FakeStepExecutor : IStepExecutor
+    private class FakeChatClient : IChatClient
     {
         private readonly bool _gateSatisfied;
         private readonly int? _failAtStep;
 
-        public FakeStepExecutor(bool gateSatisfied = true, int? failAtStep = null)
+        public FakeChatClient(bool gateSatisfied = true, int? failAtStep = null)
         {
             _gateSatisfied = gateSatisfied;
             _failAtStep = failAtStep;
         }
 
-        public Task<StepResult> ExecuteAsync(AgentStep step, Role role, CancellationToken ct = default)
+        public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
             var passed = _failAtStep.HasValue
                 ? step.StepNumber != _failAtStep.Value
                 : _gateSatisfied;
 
-            return Task.FromResult(new StepResult(
-                Output: $"Fake output for step {step.StepNumber}",
-                GateSatisfied: passed));
+            StepResult result = step.StepNumber switch
+            {
+                1 => new RehydrateResult(
+                    Output: "Objective defined",
+                    GateSatisfied: passed,
+                    SessionObjective: "Build personas for recruiting platform"),
+
+                2 => new CaptureResult(
+                    Output: "Islands captured",
+                    GateSatisfied: passed,
+                    Islands:
+                    [
+                        new("ISL-001", IslandType.UserType, "Student athlete", "product desc"),
+                        new("ISL-002", IslandType.Stakeholder, "College coach", "product desc"),
+                        new("ISL-003", IslandType.PainPoint, "No visibility", "interview", "ISL-001"),
+                    ]),
+
+                3 => new OrganizeResult(
+                    Output: "Islands organized",
+                    GateSatisfied: passed,
+                    OrganizedIslands:
+                    [
+                        new("ISL-001", IslandStatus.Organized),
+                        new("ISL-002", IslandStatus.Organized),
+                        new("ISL-003", IslandStatus.Discarded),
+                    ],
+                    Decisions: [new("DEC-001", "Merge pain into athlete persona", "Cleaner model")]),
+
+                4 => new DistillResult(
+                    Output: "Persona cards produced",
+                    GateSatisfied: passed,
+                    DistilledIslands:
+                    [
+                        new("ISL-001", IslandStatus.Distilled),
+                        new("ISL-002", IslandStatus.Distilled),
+                    ],
+                    Deliverables: [new("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)]),
+
+                5 => new ExpressResult(
+                    Output: "Relay emitted",
+                    GateSatisfied: passed,
+                    InputTokens: 2000,
+                    OutputTokens: 5000,
+                    Questions: []),
+
+                _ => new StepResult($"Fake output for step {step.StepNumber}", passed),
+            };
+
+            return Task.FromResult(result);
         }
     }
 }

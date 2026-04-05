@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentFramework.Core.Tests" />
+    <InternalsVisibleTo Include="AgentFramework.Domain" />
+  </ItemGroup>
+
 </Project>

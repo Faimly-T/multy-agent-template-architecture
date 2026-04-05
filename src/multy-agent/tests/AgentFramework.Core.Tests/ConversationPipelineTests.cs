@@ -4,6 +4,7 @@ using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
@@ -15,7 +16,7 @@ public class ConversationPipelineTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return UxPersonaFactory.Create(markdown);
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
     }
 
     // --- Step 1: First interaction builds system + user messages ---
@@ -31,9 +32,9 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client);
 
         // System message is first in conversation
-        Assert.Equal(MessageRole.System, agent.Conversation.Messages[0].Role);
-        Assert.Contains("Clara Mendes", agent.Conversation.Messages[0].Content);
-        Assert.Contains("Senior UX Researcher", agent.Conversation.Messages[0].Content);
+        Assert.Equal(MessageRole.System, agent.ConversationMessages[0].Role);
+        Assert.Contains("Clara Mendes", agent.ConversationMessages[0].Content);
+        Assert.Contains("Senior UX Researcher", agent.ConversationMessages[0].Content);
     }
 
     [Fact]
@@ -47,9 +48,9 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client);
 
         // User message is second in conversation
-        Assert.Equal(MessageRole.User, agent.Conversation.Messages[1].Role);
-        Assert.Contains("Define objective for agent", agent.Conversation.Messages[1].Content);
-        Assert.Contains("Build personas for recruiting app", agent.Conversation.Messages[1].Content);
+        Assert.Equal(MessageRole.User, agent.ConversationMessages[1].Role);
+        Assert.Contains("Define objective for agent", agent.ConversationMessages[1].Content);
+        Assert.Contains("Build personas for recruiting app", agent.ConversationMessages[1].Content);
     }
 
     [Fact]
@@ -63,8 +64,8 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client);
 
         // Assistant response is third
-        Assert.Equal(MessageRole.Assistant, agent.Conversation.Messages[2].Role);
-        Assert.Equal("Objective defined", agent.Conversation.Messages[2].Content);
+        Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
+        Assert.Equal("Objective defined", agent.ConversationMessages[2].Content);
     }
 
     [Fact]
@@ -93,7 +94,7 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client); // Step 1
         await agent.ExecuteNextStepAsync(builder, client); // Step 2
 
-        var systemMessages = agent.Conversation.Messages.Where(m => m.Role == MessageRole.System).ToList();
+        var systemMessages = agent.ConversationMessages.Where(m => m.Role == MessageRole.System).ToList();
         Assert.Single(systemMessages);
     }
 
@@ -109,7 +110,7 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client); // Step 2: user + assistant
 
         // system(1) + user(1) + assistant(1) + user(2) + assistant(2) = 5
-        Assert.Equal(5, agent.Conversation.Messages.Count);
+        Assert.Equal(5, agent.ConversationMessages.Count);
     }
 
     [Fact]
@@ -139,7 +140,7 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client); // Step 2
 
         // Step 2 user message (index 3) should reference the objective set in step 1
-        var step2UserMsg = agent.Conversation.Messages[3];
+        var step2UserMsg = agent.ConversationMessages[3];
         Assert.Contains("Build personas for college athletic recruiting platform", step2UserMsg.Content);
     }
 
@@ -173,8 +174,8 @@ public class ConversationPipelineTests
         await agent.ExecuteNextStepAsync(builder, client);
 
         // Assistant message is still recorded even on failure
-        Assert.Equal(3, agent.Conversation.Messages.Count);
-        Assert.Equal(MessageRole.Assistant, agent.Conversation.Messages[2].Role);
+        Assert.Equal(3, agent.ConversationMessages.Count);
+        Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
         Assert.Equal(0, agent.CurrentStepIndex); // did not advance
     }
 
@@ -193,7 +194,7 @@ public class ConversationPipelineTests
         Assert.Equal(5, results.Count);
         Assert.True(agent.IsCompleted);
         // system(1) + 5*(user + assistant) = 11
-        Assert.Equal(11, agent.Conversation.Messages.Count);
+        Assert.Equal(11, agent.ConversationMessages.Count);
     }
 
     // --- Fake chat client ---
@@ -250,11 +251,12 @@ public class ConversationPipelineTests
                     ],
                     Deliverables: [new("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)]),
 
-                5 => new RelayResult(
+                5 => new ExpressResult(
                     Output: "Relay emitted",
                     GateSatisfied: !_failGate,
                     InputTokens: 2000,
-                    OutputTokens: 5000),
+                    OutputTokens: 5000,
+                    Questions: []),
 
                 _ => new StepResult($"Step {step.StepNumber}", !_failGate),
             };

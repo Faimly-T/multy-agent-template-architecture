@@ -6,5 +6,5 @@ namespace AgentFramework.Core.Agent.Ports;
 
 public interface IStepMessageBuilder
 {
-    IReadOnlyList<ChatMessage> BuildMessages(AgentStep step, Role role, AgentSession? session, ConversationHistory history);
+    IReadOnlyList<ChatMessage> BuildMessages(AgentStep step, Role role, AgentSession? session, IReadOnlyList<ChatMessage> conversationHistory);
 }

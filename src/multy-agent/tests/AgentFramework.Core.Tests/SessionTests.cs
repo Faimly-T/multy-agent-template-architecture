@@ -1,3 +1,4 @@
+using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Domain.UxAgent;
 
@@ -10,7 +11,7 @@ public class SessionTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return UxPersonaFactory.Create(markdown);
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
     }
 
     // --- Checkpoint ---

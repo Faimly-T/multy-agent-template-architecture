@@ -3,6 +3,7 @@ using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 
 namespace AgentFramework.Core.Agent;
 
@@ -11,16 +12,18 @@ public class AgentAggregate<TId>
     public TId Id { get; protected set; } = default!;
     public Role Role { get; protected set; } = default!;
     public AgentSession? Session { get; private set; }
-    public ConversationHistory Conversation { get; } = new();
+
+    private readonly ConversationHistory _conversation = new();
+    public IReadOnlyList<ChatMessage> ConversationMessages => _conversation.Messages;
 
     private readonly List<DomainEvent> _domainEvents = [];
     public IReadOnlyList<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
-    private readonly List<AgentStep> _steps = [];
-    public IReadOnlyList<AgentStep> Steps => _steps.AsReadOnly();
+    public StepPipeline Pipeline { get; protected set; } = default!;
 
-    public int CurrentStepIndex { get; private set; }
-    public bool IsCompleted => CurrentStepIndex >= _steps.Count;
+    public IReadOnlyList<AgentStep> Steps => Pipeline.Steps;
+    public int CurrentStepIndex => Pipeline.CurrentStepIndex;
+    public bool IsCompleted => Pipeline.IsCompleted;
 
     protected AgentAggregate() { }
 
@@ -36,41 +39,38 @@ public class AgentAggregate<TId>
         return Session;
     }
 
-    protected void AddStep(AgentStep step) => _steps.Add(step);
-
-    protected void ReplaceSteps(IReadOnlyList<AgentStep> steps)
-    {
-        _steps.Clear();
-        _steps.AddRange(steps);
-    }
-
     protected void RaiseDomainEvent(DomainEvent @event) => _domainEvents.Add(@event);
 
     public void ClearDomainEvents() => _domainEvents.Clear();
 
-    public async Task<StepResult> ExecuteNextStepAsync(IStepExecutor executor, CancellationToken ct = default)
+    // --- Question Queries ---
+
+    public IReadOnlyList<Question> GetQuestions()
+        => Session?.Questions ?? [];
+
+    public IReadOnlyList<Question> GetQuestions(QuestionStatus status)
+        => Session?.Questions.Where(q => q.Status == status).ToList().AsReadOnly()
+           ?? [];
+
+    public IReadOnlyList<Question> GetOpenQuestions()
+        => GetQuestions(QuestionStatus.Open);
+
+    public IReadOnlyList<Question> GetPendingReviewQuestions()
+        => GetQuestions(QuestionStatus.Answered);
+
+    // --- Supply Answers (between sessions) ---
+
+    public void SupplyAnswers(IReadOnlyList<(string QuestionId, string Answer, string AnswerSource)> answers)
     {
-        if (IsCompleted)
-            throw new InvalidOperationException("All steps have been completed.");
+        if (Session is null)
+            throw new InvalidOperationException("No active session. Start a session before supplying answers.");
 
-        var step = _steps[CurrentStepIndex];
-
-        RaiseDomainEvent(new StepStarted(step.StepNumber, step.Name, step.SkillName));
-
-        var result = await executor.ExecuteAsync(step, Role, ct);
-
-        if (result.GateSatisfied)
+        foreach (var (questionId, answer, answerSource) in answers)
         {
-            Session?.Apply(result);
-            RaiseDomainEvent(new StepCompleted(step.StepNumber, step.Name, result));
-            CurrentStepIndex++;
+            var question = Session.FindQuestion(questionId)
+                ?? throw new InvalidOperationException($"Question '{questionId}' not found.");
+            question.SetAnswer(answer, answerSource);
         }
-        else
-        {
-            RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
-        }
-
-        return result;
     }
 
     public async Task<StepResult> ExecuteNextStepAsync(
@@ -81,52 +81,27 @@ public class AgentAggregate<TId>
         if (IsCompleted)
             throw new InvalidOperationException("All steps have been completed.");
 
-        var step = _steps[CurrentStepIndex];
+        var step = Pipeline.CurrentStep;
 
         RaiseDomainEvent(new StepStarted(step.StepNumber, step.Name, step.SkillName));
 
-        var messages = messageBuilder.BuildMessages(step, Role, Session, Conversation);
+        var messages = messageBuilder.BuildMessages(step, Role, Session, ConversationMessages);
 
         foreach (var msg in messages)
         {
             if (msg.Role == MessageRole.System)
-                Conversation.AddSystemMessage(msg.Content);
+                _conversation.AddSystemMessage(msg.Content);
             else
-                Conversation.AddUserMessage(msg.Content);
+                _conversation.AddUserMessage(msg.Content);
         }
 
-        var result = await chatClient.SendAsync(Conversation.Messages, step, ct);
+        var result = await chatClient.SendAsync(_conversation.Messages, step, ct);
 
-        Conversation.AddAssistantMessage(result.Output);
+        _conversation.AddAssistantMessage(result.Output);
 
-        if (result.GateSatisfied)
-        {
-            Session?.Apply(result);
-            RaiseDomainEvent(new StepCompleted(step.StepNumber, step.Name, result));
-            CurrentStepIndex++;
-        }
-        else
-        {
-            RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
-        }
+        ApplyStepOutcome(step, result);
 
         return result;
-    }
-
-    public async Task<IReadOnlyList<StepResult>> ExecuteAllStepsAsync(IStepExecutor executor, CancellationToken ct = default)
-    {
-        var results = new List<StepResult>();
-
-        while (!IsCompleted)
-        {
-            var result = await ExecuteNextStepAsync(executor, ct);
-            results.Add(result);
-
-            if (!result.GateSatisfied)
-                break;
-        }
-
-        return results.AsReadOnly();
     }
 
     public async Task<IReadOnlyList<StepResult>> ExecuteAllStepsAsync(
@@ -146,5 +121,29 @@ public class AgentAggregate<TId>
         }
 
         return results.AsReadOnly();
+    }
+
+    private void ApplyStepOutcome(AgentStep step, StepResult result)
+    {
+        if (result.GateSatisfied)
+        {
+            Session?.Apply(result);
+
+            if (result is ExpressResult express && express.Questions.Count > 0)
+            {
+                var newQuestions = express.Questions.Where(q =>
+                    string.Equals(q.Status, "open", StringComparison.OrdinalIgnoreCase)).ToList();
+                var reviewedCount = express.Questions.Count(q =>
+                    string.Equals(q.Status, "reviewed", StringComparison.OrdinalIgnoreCase));
+                RaiseDomainEvent(new QuestionsUpdated(newQuestions, reviewedCount));
+            }
+
+            RaiseDomainEvent(new StepCompleted(step.StepNumber, step.Name, result));
+            Pipeline.Advance();
+        }
+        else
+        {
+            RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
+        }
     }
 }

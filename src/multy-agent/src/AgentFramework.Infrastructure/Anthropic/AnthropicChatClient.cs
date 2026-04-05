@@ -72,7 +72,7 @@ public sealed class AnthropicChatClient : IChatClient, IDisposable
         var rawText = ExtractText(apiResponse);
         var jsonBlock = ExtractJsonBlock(rawText);
 
-        return StepResultParser.Parse(jsonBlock, rawText, step.SkillName);
+        return StepResultParser.Parse(jsonBlock, rawText, step);
     }
 
     private static (string? system, List<ApiMessage> messages) MapMessages(
