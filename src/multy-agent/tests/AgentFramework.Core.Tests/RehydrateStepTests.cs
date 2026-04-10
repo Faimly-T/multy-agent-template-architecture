@@ -19,19 +19,13 @@ public class RehydrateStepTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
     }
 
     private static UxPersona CreateAgentWithSkills()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        var skills = TestSteps.DefaultSteps()
-            .Select(s => Skill.FromMd(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
-        var steps = UxStepBuilder.Create()
-            .WithSteps(TestSteps.DefaultSteps())
-            .WithSkills(skills)
-            .Build();
-        return new UxPersona(Role.FromMd(markdown), steps);
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
     }
 
     // ==========================================================

@@ -15,13 +15,8 @@ public class SkillConversationTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        var skills = TestSteps.DefaultSteps()
-            .Select(s => Skill.FromMd(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
-        var steps = UxStepBuilder.Create()
-            .WithSteps(TestSteps.DefaultSteps())
-            .WithSkills(skills)
-            .Build();
-        return new UxPersona(Role.FromMd(markdown), steps);
+        var skills = TestSteps.DefaultSkills();
+        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), skills);
     }
 
     // --- Skill loading ---

@@ -4,12 +4,12 @@ public class StepPipeline
 {
     private readonly List<AgentStep> _steps;
 
-    public StepPipeline(IReadOnlyList<AgentStep> steps)
+    public StepPipeline(IEnumerable<AgentStep> steps)
     {
-        if (steps.Count == 0)
-            throw new ArgumentException("At least one step is required.", nameof(steps));
-
         _steps = [.. steps];
+
+        if (_steps.Count == 0)
+            throw new ArgumentException("At least one step is required.", nameof(steps));
     }
 
     public IReadOnlyList<AgentStep> Steps => _steps.AsReadOnly();

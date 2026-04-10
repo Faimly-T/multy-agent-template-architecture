@@ -34,7 +34,7 @@ public class UxPersonaTests
     public void Factory_CreatesUxPersona_WithRoleLoadedFromMd()
     {
         var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
+        var agent = new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
         Assert.Equal("ux-persona-architect", agent.Id);
         Assert.Equal("ux-persona-architect", agent.Role.Name);
@@ -47,25 +47,19 @@ public class UxPersonaTests
     [Fact]
     public void Factory_CreatesUxPersona_WithStepsLoadedFromMd()
     {
+        // Arrange - load role and steps from markdown, build skills, and inject into persona
         var markdownRole = File.ReadAllText(TestRoleDataPath);
-        var markdownRehydrate = File.ReadAllText(TestRehydrateDataPath);
-        Skill rehydrate = Skill.FromMd(markdownRehydrate);
 
-        var listSkills = new List<Skill> { rehydrate };
+        //Act - build steps and pass skills to persona (StepPipeline owns attachment)
+        var agent = new UxPersona(Role.FromMd(markdownRole), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
-        var steps = UxStepBuilder.Create()
-            .WithSteps(TestSteps.DefaultSteps())
-            .WithSkills(listSkills)
-            .Build();
-
-        var agent = new UxPersona(Role.FromMd(markdownRole), steps);
-
-
+        //Assert - verify persona has role and steps with skills attached
+        Assert.Equal("ux-persona-architect", agent.Id);
         Assert.Equal("rehydrate-context", agent.Steps[0].SkillName);
-        // Assert.Equal("autonomous-capture", agent.Steps[1].SkillName);
-        // Assert.Equal("synthesize-insights", agent.Steps[2].SkillName);
-        // Assert.Equal("generate-cards", agent.Steps[3].SkillName);
-        // Assert.Equal("express-session-state", agent.Steps[4].SkillName);
+        Assert.Equal("autonomous-capture", agent.Steps[1].SkillName);
+        Assert.Equal("strategic-organize", agent.Steps[2].SkillName);
+        Assert.Equal("expert-distill", agent.Steps[3].SkillName);
+        Assert.Equal("express-relay", agent.Steps[4].SkillName);
     }
 
     [Fact]
@@ -85,7 +79,7 @@ public class UxPersonaTests
         var chatClient = sp.GetRequiredService<IChatClient>();
 
         var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps());
+        var agent = new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
         agent.StartSession(
             "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.",

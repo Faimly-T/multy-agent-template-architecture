@@ -5,7 +5,7 @@ namespace AgentFramework.Domain.UxAgent;
 public class UxStepBuilder
 {
     private readonly List<AgentStep> _steps = [];
-    private readonly List<Skill> _skills = [];
+    private IEnumerable<Skill>? _skills;
 
     public static UxStepBuilder Create() => new();
 
@@ -21,20 +21,43 @@ public class UxStepBuilder
         return this;
     }
 
-    public UxStepBuilder WithSkills(IEnumerable<Skill> skills)
+    public UxStepBuilder WithSkills(IEnumerable<Skill>? skills)
     {
-        _skills.AddRange(skills);
+        _skills = skills;
         return this;
     }
 
-    public AgentStep[] Build()
+    public StepPipeline Build()
     {
-        foreach (var skill in _skills)
-        {
-            var step = _steps.FirstOrDefault(s => s.SkillName == skill.Name);
-            step?.AttachSkill(skill);
-        }
+        if (_skills is not null)
+            AttachSkills();
 
-        return [.. _steps];
+        ValidateSkills();
+
+        return new StepPipeline(_steps);
+    }
+
+    private void AttachSkills()
+    {
+        var skillMap = _skills!.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var step in _steps)
+        {
+            if (!string.IsNullOrEmpty(step.SkillName) && skillMap.TryGetValue(step.SkillName, out var skill))
+                step.AttachSkill(skill);
+        }
+    }
+
+    private void ValidateSkills()
+    {
+        var missing = _steps
+            .Where(s => !string.IsNullOrEmpty(s.SkillName) && s.Skill is null)
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            var details = string.Join(", ", missing.Select(s => $"Step {s.StepNumber} '{s.Name}' requires skill '{s.SkillName}'"));
+            throw new InvalidOperationException($"Steps are missing required skills: {details}");
+        }
     }
 }

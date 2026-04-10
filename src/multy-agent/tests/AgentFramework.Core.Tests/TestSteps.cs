@@ -1,11 +1,16 @@
 using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 internal static class TestSteps
 {
-    public static StepPipeline DefaultPipeline() => new(DefaultSteps());
+    public static StepPipeline DefaultPipeline() =>
+        UxStepBuilder.Create().WithSteps(DefaultSteps()).WithSkills(DefaultSkills()).Build();
+
+    public static IEnumerable<Skill> DefaultSkills() =>
+        DefaultSteps().Select(s => Skill.FromMd(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
 
     public static AgentStep[] DefaultSteps() =>
     [
