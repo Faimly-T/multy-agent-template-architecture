@@ -29,10 +29,10 @@ public class OrganizeStep : AgentStep
 
     public override string BuildContext(AgentSession? session)
     {
-        if (session is null || session.Islands.Count == 0)
+        if (session is null || session.Backlog.Count == 0)
             return "Current Islands: None captured yet";
 
-        var lines = session.Islands.Select(i =>
+        var lines = session.Backlog.All.Select(i =>
             $"- {i.Id} [{i.Type}] {i.Description} (Status: {i.Status})" +
             (i.RelatesToIslandId is not null ? $" → relates to {i.RelatesToIslandId}" : ""));
         return $"Current Islands:\n{string.Join("\n", lines)}";
@@ -74,22 +74,9 @@ public record OrganizeResult(
     IReadOnlyList<IslandOrganization> OrganizedIslands,
     IReadOnlyList<DecisionRecord> Decisions) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        foreach (var org in OrganizedIslands)
-        {
-            var island = session.FindIsland(org.IslandId);
-            if (island is null) continue;
-
-            switch (org.NewStatus)
-            {
-                case IslandStatus.Organized: island.Organize(); break;
-                case IslandStatus.Discarded: island.Discard(); break;
-            }
-        }
-
-        foreach (var dec in Decisions)
-            session.RecordDecision(dec.Id, dec.Description, dec.Impact);
+        writer.ApplyOrganization(OrganizedIslands, Decisions);
     }
 }
 

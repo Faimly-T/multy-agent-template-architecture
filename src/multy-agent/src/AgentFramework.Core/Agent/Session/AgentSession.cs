@@ -1,13 +1,13 @@
-using AgentFramework.Core.Agent.Steps;
-
 namespace AgentFramework.Core.Agent.Session;
 
 public class AgentSession
 {
     public Checkpoint Checkpoint { get; private set; }
 
-    private readonly List<Island> _islands = [];
-    public IReadOnlyList<Island> Islands => _islands.AsReadOnly();
+    public IslandBacklog Backlog { get; } = new();
+
+    // Convenience accessor — delegates to Backlog for backward-compatible reads
+    public IReadOnlyList<Island> Islands => Backlog.All;
 
     private readonly List<Deliverable> _deliverables = [];
     public IReadOnlyList<Deliverable> Deliverables => _deliverables.AsReadOnly();
@@ -27,10 +27,6 @@ public class AgentSession
             TokensConsumption: new TokenConsumption(0, 0));
     }
 
-    // --- Apply typed step results ---
-
-    internal void Apply(StepResult result) => result.ApplyTo(this);
-
     // --- Checkpoint ---
 
     internal void UpdateObjective(string sessionObjective)
@@ -45,17 +41,6 @@ public class AgentSession
             TokensConsumption = new TokenConsumption(inputTokens, outputTokens)
         };
     }
-
-    // --- Islands ---
-
-    internal Island CaptureIsland(string id, IslandType type, string description, string source)
-    {
-        var island = new Island(id, type, description, source);
-        _islands.Add(island);
-        return island;
-    }
-
-    internal Island? FindIsland(string id) => _islands.Find(i => i.Id == id);
 
     // --- Deliverables ---
 

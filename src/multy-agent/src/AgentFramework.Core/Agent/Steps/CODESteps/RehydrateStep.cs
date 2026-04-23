@@ -94,13 +94,13 @@ public class RehydrateStep : AgentStep
         }
 
         // --- Prior work summary ---
-        if (session.Islands.Count > 0 || session.Decisions.Count > 0 || session.Deliverables.Count > 0)
+        if (session.Backlog.Count > 0 || session.Decisions.Count > 0 || session.Deliverables.Count > 0)
         {
             context += $"""
 
 
                 Prior work summary:
-                Islands: {session.Islands.Count} total ({session.Islands.Count(i => i.Status == IslandStatus.Distilled)} distilled)
+                Islands: {session.Backlog.Count} total ({session.Backlog.GetByStatus(IslandStatus.Distilled).Count} distilled)
                 Decisions: {session.Decisions.Count}
                 Deliverables: {session.Deliverables.Count}
                 """;
@@ -151,8 +151,8 @@ public record RehydrateResult(
     bool IsInitialSession = false,
     IReadOnlyList<RehydrateBlocker>? Blockers = null) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        session.UpdateObjective(SessionObjective);
+        writer.UpdateObjective(SessionObjective);
     }
 }

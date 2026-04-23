@@ -56,7 +56,7 @@ public class StepPipelineTests
     public void NewAgent_StartsAtStep0_NotCompleted()
     {
         var agent = CreateAgent();
-        Assert.Equal(0, agent.CurrentStepIndex);
+        Assert.Equal(0, agent.Pipeline.CurrentStepIndex);
         Assert.False(agent.IsCompleted);
     }
 
@@ -71,7 +71,7 @@ public class StepPipelineTests
         var result = await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.True(result.GateSatisfied);
-        Assert.Equal(1, agent.CurrentStepIndex);
+        Assert.Equal(1, agent.Pipeline.CurrentStepIndex);
         Assert.Equal(2, agent.DomainEvents.Count);
         Assert.IsType<StepStarted>(agent.DomainEvents[0]);
         Assert.IsType<StepCompleted>(agent.DomainEvents[1]);
@@ -88,7 +88,7 @@ public class StepPipelineTests
         var result = await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.False(result.GateSatisfied);
-        Assert.Equal(0, agent.CurrentStepIndex); // did not advance
+        Assert.Equal(0, agent.Pipeline.CurrentStepIndex); // did not advance
         Assert.Equal(2, agent.DomainEvents.Count);
         Assert.IsType<StepStarted>(agent.DomainEvents[0]);
         Assert.IsType<StepGateFailed>(agent.DomainEvents[1]);
@@ -121,7 +121,7 @@ public class StepPipelineTests
 
         Assert.Equal(3, results.Count);
         Assert.False(agent.IsCompleted);
-        Assert.Equal(2, agent.CurrentStepIndex); // stopped at step 3 (index 2)
+        Assert.Equal(2, agent.Pipeline.CurrentStepIndex); // stopped at step 3 (index 2)
     }
 
     [Fact]

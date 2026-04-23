@@ -7,7 +7,7 @@ using AgentFramework.Core.Agent.Steps.CODESteps;
 
 namespace AgentFramework.Core.Agent;
 
-public class AgentAggregate<TId>
+public class AgentAggregate<TId> : ISessionWriter
 {
     public TId Id { get; protected set; } = default!;
     public Role Role { get; protected set; } = default!;
@@ -22,7 +22,6 @@ public class AgentAggregate<TId>
     public StepPipeline Pipeline { get; protected set; } = default!;
 
     public IReadOnlyList<AgentStep> Steps => Pipeline.Steps;
-    public int CurrentStepIndex => Pipeline.CurrentStepIndex;
     public bool IsCompleted => Pipeline.IsCompleted;
 
     protected AgentAggregate() { }
@@ -127,7 +126,19 @@ public class AgentAggregate<TId>
     {
         if (result.GateSatisfied)
         {
-            Session?.Apply(result);
+            if (Session is not null)
+                result.ApplyTo(this);
+
+            // Domain-verified gate: if the step has a verifier, override LLM's self-report
+            if (Session is not null && step.Gate.Verify is not null)
+            {
+                var verified = step.Gate.Verify(Session, result);
+                if (!verified)
+                {
+                    RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
+                    return;
+                }
+            }
 
             if (result is ExpressResult express && express.Questions.Count > 0)
             {
@@ -144,6 +155,63 @@ public class AgentAggregate<TId>
         else
         {
             RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
+        }
+    }
+
+    // ==========================================================
+    // ISessionWriter — Aggregate-controlled visitor surface
+    // ==========================================================
+
+    void ISessionWriter.UpdateObjective(string sessionObjective)
+    {
+        Session!.UpdateObjective(sessionObjective);
+    }
+
+    void ISessionWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
+    {
+        Session!.Backlog.SetCaptured(islands);
+    }
+
+    void ISessionWriter.ApplyOrganization(IReadOnlyList<IslandOrganization> organizations, IReadOnlyList<DecisionRecord> decisions)
+    {
+        Session!.Backlog.ApplyOrganization(organizations);
+
+        foreach (var dec in decisions)
+            Session.RecordDecision(dec.Id, dec.Description, dec.Impact);
+    }
+
+    void ISessionWriter.ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables)
+    {
+        Session!.Backlog.ApplyDistillation(distillations);
+
+        foreach (var del in deliverables)
+            Session.RecordDeliverable(del.DeliverableId, del.Path, del.Status);
+    }
+
+    void ISessionWriter.UpdateTokenConsumption(int inputTokens, int outputTokens)
+    {
+        Session!.UpdateTokenConsumption(inputTokens, outputTokens);
+    }
+
+    void ISessionWriter.RaiseQuestion(string id, string text, string source)
+    {
+        if (Session!.FindQuestion(id) is not null)
+            throw new InvalidOperationException($"Question '{id}' already exists in this session.");
+
+        Session.RaiseQuestion(id, text, source);
+    }
+
+    void ISessionWriter.ReviewQuestion(string id, QuestionStatus newStatus)
+    {
+        var existing = Session!.FindQuestion(id);
+        if (existing is not null)
+        {
+            Session.ApplyQuestionReview(id, newStatus);
+        }
+        // If question doesn't exist and status is Open, treat as a new question
+        else if (newStatus == QuestionStatus.Open)
+        {
+            Session.RaiseQuestion(id, string.Empty, "express-relay");
         }
     }
 }

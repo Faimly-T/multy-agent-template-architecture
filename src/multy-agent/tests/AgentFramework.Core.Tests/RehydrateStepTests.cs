@@ -3,6 +3,7 @@ using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
@@ -231,7 +232,9 @@ public class RehydrateStepTests
     {
         var step = CreateStep();
         var session = new AgentSession("Refine personas", sessionIteration: 2);
-        session.CaptureIsland("ISL-001", IslandType.UserType, "Student athlete", "input");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Student athlete", "input")
+        ]);
         session.RecordDecision("DEC-001", "Merge clusters", "Cleaner model");
         session.RecordDeliverable("DEL-001", "outputs/personas/01.md", DeliverableStatus.Complete);
 
@@ -345,7 +348,8 @@ public class RehydrateStepTests
     [Fact]
     public void ApplyTo_UpdatesSessionObjective()
     {
-        var session = new AgentSession("placeholder");
+        var agent = CreateAgent();
+        agent.StartSession("placeholder");
         var result = new RehydrateResult(
             Output: "json output",
             GateSatisfied: true,
@@ -353,24 +357,27 @@ public class RehydrateStepTests
             NarrativeBridge: "First session — starting fresh.",
             IsInitialSession: true);
 
-        result.ApplyTo(session);
+        result.ApplyTo((ISessionWriter)agent);
 
-        Assert.Equal("Build 3 validated persona cards for athletic recruiting", session.Checkpoint.SessionObjective);
+        Assert.Equal("Build 3 validated persona cards for athletic recruiting", agent.Session!.Checkpoint.SessionObjective);
     }
 
     [Fact]
     public void ApplyTo_PreservesExistingSessionState()
     {
-        var session = new AgentSession("initial", sessionIteration: 2);
-        session.CaptureIsland("ISL-001", IslandType.UserType, "Athlete", "input");
+        var agent = CreateAgent();
+        var session = agent.StartSession("initial", sessionIteration: 2);
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "input")
+        ]);
         session.RaiseQuestion("UX-Q001", "What sport?", "express");
 
         var result = new RehydrateResult("json", true, "Refined objective");
-        result.ApplyTo(session);
+        result.ApplyTo((ISessionWriter)agent);
 
-        Assert.Equal("Refined objective", session.Checkpoint.SessionObjective);
-        Assert.Single(session.Islands);
-        Assert.Single(session.Questions);
+        Assert.Equal("Refined objective", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Single(agent.Session.Backlog.All);
+        Assert.Single(agent.Session.Questions);
     }
 
     // ==========================================================
@@ -472,7 +479,7 @@ public class RehydrateStepTests
         Assert.Equal(
             "Build validated persona cards for college athletic recruiting platform. Success = 3+ distinct personas with JTBD. Stakes: journey mapping and UX design blocked without foundational personas.",
             agent.Session.Checkpoint.SessionObjective);
-        Assert.Equal(1, agent.CurrentStepIndex);
+        Assert.Equal(1, agent.Pipeline.CurrentStepIndex);
     }
 
     [Fact]
@@ -549,7 +556,7 @@ public class RehydrateStepTests
         var result = await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.False(result.GateSatisfied);
-        Assert.Equal(0, agent.CurrentStepIndex);
+        Assert.Equal(0, agent.Pipeline.CurrentStepIndex);
     }
 
     // ==========================================================

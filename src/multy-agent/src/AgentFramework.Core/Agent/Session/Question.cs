@@ -1,6 +1,6 @@
  namespace AgentFramework.Core.Agent.Session;
 
-public class Question
+public sealed class Question
 {
     public string Id { get; }
     public string Text { get; }

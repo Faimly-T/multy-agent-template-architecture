@@ -106,6 +106,6 @@ public class UxPersonaTests
         Assert.True(agent.ConversationMessages.Count >= 3);
 
         // Step index should have advanced
-        Assert.Equal(1, agent.CurrentStepIndex);
+        Assert.Equal(1, agent.Pipeline.CurrentStepIndex);
     }
 }

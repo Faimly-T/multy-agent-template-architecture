@@ -26,9 +26,9 @@ public class ExpressStep : AgentStep
         var deliverables = session.Deliverables
             .Select(d => $"- {d.DeliverableId}: {d.Path} ({d.Status})");
 
-        var islandStats = $"Islands: {session.Islands.Count} total, " +
-            $"{session.Islands.Count(i => i.Status == IslandStatus.Distilled)} distilled, " +
-            $"{session.Islands.Count(i => i.Status == IslandStatus.Discarded)} discarded";
+        var islandStats = $"Islands: {session.Backlog.Count} total, " +
+            $"{session.Backlog.GetByStatus(IslandStatus.Distilled).Count} distilled, " +
+            $"{session.Backlog.GetByStatus(IslandStatus.Discarded).Count} discarded";
 
         var questionsBlock = BuildQuestionsBlock(session);
 
@@ -95,9 +95,9 @@ public record ExpressResult(
     int OutputTokens,
     IReadOnlyList<QuestionRecord> Questions) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        session.UpdateTokenConsumption(InputTokens, OutputTokens);
+        writer.UpdateTokenConsumption(InputTokens, OutputTokens);
 
         foreach (var q in Questions)
         {
@@ -105,14 +105,13 @@ public record ExpressResult(
                 ? s
                 : QuestionStatus.Open;
 
-            var existing = session.FindQuestion(q.Id);
-            if (existing is not null)
+            if (status == QuestionStatus.Open)
             {
-                session.ApplyQuestionReview(q.Id, status);
+                writer.RaiseQuestion(q.Id, q.Text, "express-relay");
             }
             else
             {
-                session.RaiseQuestion(q.Id, q.Text, "express-relay");
+                writer.ReviewQuestion(q.Id, status);
             }
         }
     }

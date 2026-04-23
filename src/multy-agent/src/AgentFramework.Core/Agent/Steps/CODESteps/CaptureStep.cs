@@ -57,14 +57,9 @@ public record CaptureResult(
     bool GateSatisfied,
     IReadOnlyList<CapturedIsland> Islands) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        foreach (var island in Islands)
-        {
-            var captured = session.CaptureIsland(island.Id, island.Type, island.Description, island.Source);
-            if (island.RelatesToIslandId is not null)
-                captured.RelateTo(island.RelatesToIslandId);
-        }
+        writer.SetCapturedIslands(Islands);
     }
 }
 

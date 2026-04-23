@@ -31,8 +31,7 @@ public class DistillStep : AgentStep
     {
         if (session is null) return "No session context";
 
-        var organized = session.Islands
-            .Where(i => i.Status == IslandStatus.Organized)
+        var organized = session.Backlog.GetByStatus(IslandStatus.Organized)
             .Select(i => $"- {i.Id} [{i.Type}] {i.Description}");
 
         var decisions = session.Decisions
@@ -84,22 +83,9 @@ public record DistillResult(
     IReadOnlyList<IslandDistillation> DistilledIslands,
     IReadOnlyList<DeliverableRecord> Deliverables) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        foreach (var dist in DistilledIslands)
-        {
-            var island = session.FindIsland(dist.IslandId);
-            if (island is null) continue;
-
-            switch (dist.NewStatus)
-            {
-                case IslandStatus.Distilled: island.Distill(); break;
-                case IslandStatus.Discarded: island.Discard(); break;
-            }
-        }
-
-        foreach (var del in Deliverables)
-            session.RecordDeliverable(del.DeliverableId, del.Path, del.Status);
+        writer.ApplyDistillation(DistilledIslands, Deliverables);
     }
 }
 

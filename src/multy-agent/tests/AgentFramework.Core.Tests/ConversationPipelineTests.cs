@@ -176,7 +176,7 @@ public class ConversationPipelineTests
         // Assistant message is still recorded even on failure
         Assert.Equal(3, agent.ConversationMessages.Count);
         Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
-        Assert.Equal(0, agent.CurrentStepIndex); // did not advance
+        Assert.Equal(0, agent.Pipeline.CurrentStepIndex); // did not advance
     }
 
     // --- Full pipeline ---

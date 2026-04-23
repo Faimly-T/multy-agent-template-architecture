@@ -156,13 +156,14 @@ public class QuestionTests
     }
 
     // ==========================================================
-    // AgentSession.Apply — Express with Questions
+    // Aggregate — Express with Questions (via ISessionWriter)
     // ==========================================================
 
     [Fact]
     public void ApplyExpress_RaisesNewQuestions()
     {
-        var session = new AgentSession("objective");
+        var agent = CreateAgent();
+        agent.StartSession("objective");
         var result = new ExpressResult(
             Output: "done",
             GateSatisfied: true,
@@ -170,17 +171,18 @@ public class QuestionTests
             OutputTokens: 200,
             Questions: [new QuestionRecord("UX-Q001", "What scope?", "open")]);
 
-        session.Apply(result);
+        result.ApplyTo((ISessionWriter)agent);
 
-        Assert.Single(session.Questions);
-        Assert.Equal("UX-Q001", session.Questions[0].Id);
-        Assert.Equal(QuestionStatus.Open, session.Questions[0].Status);
+        Assert.Single(agent.Session!.Questions);
+        Assert.Equal("UX-Q001", agent.Session.Questions[0].Id);
+        Assert.Equal(QuestionStatus.Open, agent.Session.Questions[0].Status);
     }
 
     [Fact]
     public void ApplyExpress_ReviewsAnsweredQuestions()
     {
-        var session = new AgentSession("objective");
+        var agent = CreateAgent();
+        var session = agent.StartSession("objective");
         session.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
         session.FindQuestion("UX-Q001")!.SetAnswer("Football only", "PjM");
 
@@ -191,15 +193,16 @@ public class QuestionTests
             OutputTokens: 200,
             Questions: [new QuestionRecord("UX-Q001", "What scope?", "reviewed")]);
 
-        session.Apply(result);
+        result.ApplyTo((ISessionWriter)agent);
 
-        Assert.Equal(QuestionStatus.Reviewed, session.Questions[0].Status);
+        Assert.Equal(QuestionStatus.Reviewed, agent.Session!.Questions[0].Status);
     }
 
     [Fact]
     public void ApplyExpress_MarksQuestionsObsolete()
     {
-        var session = new AgentSession("objective");
+        var agent = CreateAgent();
+        var session = agent.StartSession("objective");
         session.RaiseQuestion("UX-Q001", "Old question", "express-relay");
 
         var result = new ExpressResult(
@@ -209,15 +212,16 @@ public class QuestionTests
             OutputTokens: 200,
             Questions: [new QuestionRecord("UX-Q001", "Old question", "obsolete")]);
 
-        session.Apply(result);
+        result.ApplyTo((ISessionWriter)agent);
 
-        Assert.Equal(QuestionStatus.Obsolete, session.Questions[0].Status);
+        Assert.Equal(QuestionStatus.Obsolete, agent.Session!.Questions[0].Status);
     }
 
     [Fact]
     public void ApplyExpress_UpdatesTokensAndQuestions()
     {
-        var session = new AgentSession("objective");
+        var agent = CreateAgent();
+        agent.StartSession("objective");
         var result = new ExpressResult(
             Output: "done",
             GateSatisfied: true,
@@ -227,11 +231,11 @@ public class QuestionTests
                 new QuestionRecord("UX-Q001", "Question 1", "open"),
                 new QuestionRecord("UX-Q002", "Question 2", "open")]);
 
-        session.Apply(result);
+        result.ApplyTo((ISessionWriter)agent);
 
-        Assert.Equal(1500, session.Checkpoint.TokensConsumption.InputTokens);
-        Assert.Equal(3000, session.Checkpoint.TokensConsumption.OutputTokens);
-        Assert.Equal(2, session.Questions.Count);
+        Assert.Equal(1500, agent.Session!.Checkpoint.TokensConsumption.InputTokens);
+        Assert.Equal(3000, agent.Session.Checkpoint.TokensConsumption.OutputTokens);
+        Assert.Equal(2, agent.Session.Questions.Count);
     }
 
     // ==========================================================

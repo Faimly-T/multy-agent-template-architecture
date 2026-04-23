@@ -1,5 +1,6 @@
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Session;
+using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
@@ -71,17 +72,20 @@ public class SessionTests
         Assert.Equal(3, session.Checkpoint.SessionIteration);
     }
 
-    // --- Islands ---
+    // --- Islands (via IslandBacklog) ---
 
     [Fact]
-    public void CaptureIsland_AddsIslandWithCapturedStatus()
+    public void SetCaptured_AddsIslandsWithCapturedStatus()
     {
         var agent = CreateAgent();
         var session = agent.StartSession("objective");
 
-        var island = session.CaptureIsland("ISL-001", IslandType.UserType, "Student athlete seeking recruitment", "product description");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Student athlete seeking recruitment", "product description")
+        ]);
 
-        Assert.Single(session.Islands);
+        Assert.Single(session.Backlog.All);
+        var island = session.Backlog.All[0];
         Assert.Equal("ISL-001", island.Id);
         Assert.Equal(IslandType.UserType, island.Type);
         Assert.Equal("Student athlete seeking recruitment", island.Description);
@@ -90,69 +94,184 @@ public class SessionTests
     }
 
     [Fact]
-    public void Island_RelateTo_SetsRelation()
+    public void SetCaptured_PreservesRelatesToIslandId()
     {
         var agent = CreateAgent();
         var session = agent.StartSession("objective");
 
-        var parent = session.CaptureIsland("ISL-001", IslandType.UserType, "Athlete", "desc");
-        var child = session.CaptureIsland("ISL-002", IslandType.Goal, "Get recruited", "desc");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
+            new CapturedIsland("ISL-002", IslandType.Goal, "Get recruited", "desc", "ISL-001")
+        ]);
 
-        child.RelateTo("ISL-001");
-
-        Assert.Equal("ISL-001", child.RelatesToIslandId);
-        Assert.Null(parent.RelatesToIslandId);
+        Assert.Null(session.Backlog.All[0].RelatesToIslandId);
+        Assert.Equal("ISL-001", session.Backlog.All[1].RelatesToIslandId);
     }
 
     [Fact]
-    public void Island_StatusTransitions()
+    public void Backlog_StatusTransitions_CapturedToOrganizedToDistilled()
     {
         var agent = CreateAgent();
         var session = agent.StartSession("objective");
-        var island = session.CaptureIsland("ISL-001", IslandType.PainPoint, "No visibility", "interview");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.PainPoint, "No visibility", "interview")
+        ]);
 
-        Assert.Equal(IslandStatus.Captured, island.Status);
+        Assert.Equal(IslandStatus.Captured, session.Backlog.All[0].Status);
 
-        island.Organize();
-        Assert.Equal(IslandStatus.Organized, island.Status);
+        session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
+        Assert.Equal(IslandStatus.Organized, session.Backlog.All[0].Status);
 
-        island.Distill();
-        Assert.Equal(IslandStatus.Distilled, island.Status);
+        session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]);
+        Assert.Equal(IslandStatus.Distilled, session.Backlog.All[0].Status);
     }
 
     [Fact]
-    public void Island_CanBeDiscarded()
+    public void Backlog_CanDiscardDuringOrganize()
     {
         var agent = CreateAgent();
         var session = agent.StartSession("objective");
-        var island = session.CaptureIsland("ISL-001", IslandType.AntiUser, "Tourist", "capture");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.AntiUser, "Tourist", "capture"),
+            new CapturedIsland("ISL-002", IslandType.UserType, "Athlete", "capture")
+        ]);
 
-        island.Discard();
+        session.Backlog.ApplyOrganization([
+            new IslandOrganization("ISL-001", IslandStatus.Discarded),
+            new IslandOrganization("ISL-002", IslandStatus.Organized)
+        ]);
 
-        Assert.Equal(IslandStatus.Discarded, island.Status);
+        Assert.Equal(IslandStatus.Discarded, session.Backlog.All[0].Status);
+        Assert.Equal(IslandStatus.Organized, session.Backlog.All[1].Status);
+    }
+
+    // --- IslandBacklog Guard Tests ---
+
+    [Fact]
+    public void Backlog_ApplyOrganization_ThrowsOnInvalidTransition_OrganizedToOrganized()
+    {
+        var agent = CreateAgent();
+        var session = agent.StartSession("objective");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
+        ]);
+        session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]));
     }
 
     [Fact]
-    public void FindIsland_ReturnsCorrectIsland()
+    public void Backlog_ApplyDistillation_ThrowsWhenNotOrganized()
     {
         var agent = CreateAgent();
         var session = agent.StartSession("objective");
-        session.CaptureIsland("ISL-001", IslandType.UserType, "Athlete", "desc");
-        session.CaptureIsland("ISL-002", IslandType.Stakeholder, "Coach", "desc");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
+        ]);
 
-        var found = session.FindIsland("ISL-002");
+        Assert.Throws<InvalidOperationException>(() =>
+            session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]));
+    }
+
+    [Fact]
+    public void Backlog_ApplyOrganization_ThrowsWhenAlreadyDiscarded()
+    {
+        var agent = CreateAgent();
+        var session = agent.StartSession("objective");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
+            new CapturedIsland("ISL-002", IslandType.Goal, "Keep", "desc")
+        ]);
+        session.Backlog.ApplyOrganization([
+            new IslandOrganization("ISL-001", IslandStatus.Discarded),
+            new IslandOrganization("ISL-002", IslandStatus.Organized)
+        ]);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]));
+    }
+
+    [Fact]
+    public void Backlog_ApplyDistillation_ThrowsWhenAlreadyDistilled()
+    {
+        var agent = CreateAgent();
+        var session = agent.StartSession("objective");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
+        ]);
+        session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
+        session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Discarded)]));
+    }
+
+    // --- ISessionWriter Invariant Tests ---
+
+    [Fact]
+    public void SessionWriter_SetCapturedIslands_ThrowsOnDuplicateIds()
+    {
+        var agent = CreateAgent();
+        agent.StartSession("objective");
+        var writer = (ISessionWriter)agent;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            writer.SetCapturedIslands([
+                new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
+                new CapturedIsland("ISL-001", IslandType.Goal, "Duplicate", "desc")
+            ]));
+    }
+
+    [Fact]
+    public void SessionWriter_RaiseQuestion_ThrowsOnDuplicateId()
+    {
+        var agent = CreateAgent();
+        agent.StartSession("objective");
+        var writer = (ISessionWriter)agent;
+
+        writer.RaiseQuestion("Q-001", "First", "express-relay");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            writer.RaiseQuestion("Q-001", "Duplicate", "express-relay"));
+    }
+
+    [Fact]
+    public void SessionWriter_ApplyOrganization_ThrowsOnMissingIsland()
+    {
+        var agent = CreateAgent();
+        agent.StartSession("objective");
+        var writer = (ISessionWriter)agent;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            writer.ApplyOrganization(
+                [new IslandOrganization("MISSING", IslandStatus.Organized)],
+                []));
+    }
+
+    [Fact]
+    public void Backlog_Find_ReturnsCorrectIsland()
+    {
+        var agent = CreateAgent();
+        var session = agent.StartSession("objective");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
+            new CapturedIsland("ISL-002", IslandType.Stakeholder, "Coach", "desc")
+        ]);
+
+        var found = session.Backlog.Find("ISL-002");
 
         Assert.NotNull(found);
         Assert.Equal("Coach", found.Description);
     }
 
     [Fact]
-    public void FindIsland_ReturnsNull_WhenNotFound()
+    public void Backlog_Find_ReturnsNull_WhenNotFound()
     {
         var agent = CreateAgent();
         var session = agent.StartSession("objective");
 
-        Assert.Null(session.FindIsland("NONEXISTENT"));
+        Assert.Null(session.Backlog.Find("NONEXISTENT"));
     }
 
     // --- Deliverables ---
@@ -229,11 +348,13 @@ public class SessionTests
     {
         var agent = CreateAgent();
         var first = agent.StartSession("first objective");
-        first.CaptureIsland("ISL-001", IslandType.UserType, "Athlete", "desc");
+        first.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
+        ]);
 
         var second = agent.StartSession("second objective", sessionIteration: 2);
 
-        Assert.Empty(second.Islands);
+        Assert.Empty(second.Backlog.All);
         Assert.Equal("second objective", second.Checkpoint.SessionObjective);
     }
 }
