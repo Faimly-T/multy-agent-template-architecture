@@ -1,5 +1,6 @@
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
@@ -34,7 +35,7 @@ public class UxPersonaTests
     public void Factory_CreatesUxPersona_WithRoleLoadedFromMd()
     {
         var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
         Assert.Equal("ux-persona-architect", agent.Id);
         Assert.Equal("ux-persona-architect", agent.Role.Name);
@@ -51,7 +52,7 @@ public class UxPersonaTests
         var markdownRole = File.ReadAllText(TestRoleDataPath);
 
         //Act - build steps and pass skills to persona (StepPipeline owns attachment)
-        var agent = new UxPersona(Role.FromMd(markdownRole), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdownRole), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
         //Assert - verify persona has role and steps with skills attached
         Assert.Equal("ux-persona-architect", agent.Id);
@@ -79,7 +80,7 @@ public class UxPersonaTests
         var chatClient = sp.GetRequiredService<IChatClient>();
 
         var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
         agent.StartSession(
             "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.",
@@ -107,5 +108,88 @@ public class UxPersonaTests
 
         // Step index should have advanced
         Assert.Equal(1, agent.Pipeline.CurrentStepIndex);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task UxPersona_FullProcess_RunAsync_CompletesAllFiveCodeSteps()
+    {
+        // Arrange — builds DI container from appsettings.json + appsettings.local.json
+        var config = BuildConfiguration();
+        var apiKey = config.GetSection(AnthropicOptions.SectionName)["ApiKey"];
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            // Silently pass when no key is configured (CI, local dev without key)
+            return;
+        }
+
+        await using var sp = BuildServiceProvider(config);
+        var chatClient = sp.GetRequiredService<IChatClient>();
+
+        var markdown = File.ReadAllText(TestRoleDataPath);
+        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+
+        // Create test implementations
+        var pipelineFactory = new TestPipelineFactory();
+        var deliverableWriter = new TestDeliverableWriter();
+
+        // Act — execute full process via RunAsync
+        var runResult = await agent.RunAsync(
+            "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.",
+            chatClient,
+            new TestSkillProvider(),
+            deliverableWriter,
+            pipelineFactory,
+            new UxStepMessageBuilder());
+
+        // Assert
+        Assert.True(runResult.Completed);
+        Assert.Equal(5, runResult.StepResults.Count);
+        Assert.NotNull(runResult.Session);
+
+        Assert.IsType<RehydrateResult>(runResult.StepResults[0]);
+        Assert.IsType<CaptureResult>(runResult.StepResults[1]);
+        Assert.IsType<OrganizeResult>(runResult.StepResults[2]);
+        Assert.IsType<DistillResult>(runResult.StepResults[3]);
+        Assert.IsType<ExpressResult>(runResult.StepResults[4]);
+
+        Assert.All(runResult.StepResults, result => Assert.True(result.GateSatisfied));
+
+        Assert.NotEmpty(runResult.Session.Deliverables);
+        Assert.True(runResult.Session.Checkpoint.SessionObjective.Contains("recruiting platform", StringComparison.OrdinalIgnoreCase));
+        Assert.True(runResult.Session.Checkpoint.TokensConsumption.InputTokens >= 0);
+        Assert.True(runResult.Session.Checkpoint.TokensConsumption.OutputTokens >= 0);
+
+        // Verify deliverables were written
+        Assert.True(deliverableWriter.WasWritten);
+    }
+
+    // Test implementations
+    private class TestPipelineFactory : IPipelineFactory
+    {
+        public Task<StepPipeline> CreatePipelineAsync(Role role, ISkillProvider skillProvider, CancellationToken ct = default)
+        {
+            return Task.FromResult(TestSteps.DefaultPipeline());
+        }
+    }
+
+    private class TestDeliverableWriter : IDeliverableWriter
+    {
+        public bool WasWritten { get; private set; }
+
+        public Task WriteAsync(AgentSession session, IReadOnlyList<StepResult> results, CancellationToken ct = default)
+        {
+            WasWritten = true;
+            return Task.CompletedTask;
+        }
+    }
+
+    private class TestSkillProvider : ISkillProvider
+    {
+        public Task<Skill> LoadAsync(string skillName, CancellationToken ct = default)
+        {
+            var skills = TestSteps.DefaultSkills().ToDictionary(s => s.Name);
+            return Task.FromResult(skills[skillName]);
+        }
     }
 }

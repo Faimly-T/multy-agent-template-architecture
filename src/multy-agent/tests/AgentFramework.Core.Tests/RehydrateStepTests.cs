@@ -20,13 +20,13 @@ public class RehydrateStepTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
     }
 
     private static UxPersona CreateAgentWithSkills()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
     }
 
     // ==========================================================
@@ -357,7 +357,7 @@ public class RehydrateStepTests
             NarrativeBridge: "First session — starting fresh.",
             IsInitialSession: true);
 
-        result.ApplyTo((ISessionWriter)agent);
+        result.ApplyTo(agent.Session!);
 
         Assert.Equal("Build 3 validated persona cards for athletic recruiting", agent.Session!.Checkpoint.SessionObjective);
     }
@@ -373,7 +373,7 @@ public class RehydrateStepTests
         session.RaiseQuestion("UX-Q001", "What sport?", "express");
 
         var result = new RehydrateResult("json", true, "Refined objective");
-        result.ApplyTo((ISessionWriter)agent);
+        result.ApplyTo(agent.Session!);
 
         Assert.Equal("Refined objective", agent.Session!.Checkpoint.SessionObjective);
         Assert.Single(agent.Session.Backlog.All);

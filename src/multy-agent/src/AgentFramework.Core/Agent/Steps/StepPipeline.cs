@@ -24,5 +24,23 @@ public class StepPipeline
 
     public AgentStep this[int index] => _steps[index];
 
-    internal void Advance() => CurrentStepIndex++;
+    public bool TryGetCurrentStep(out AgentStep? step)
+    {
+        if (IsCompleted)
+        {
+            step = null;
+            return false;
+        }
+
+        step = _steps[CurrentStepIndex];
+        return true;
+    }
+
+    internal void Advance()
+    {
+        if (IsCompleted)
+            throw new InvalidOperationException("Cannot advance beyond the last step.");
+
+        CurrentStepIndex++;
+    }
 }

@@ -20,6 +20,6 @@ public sealed class FileSkillProvider : ISkillProvider
             throw new FileNotFoundException($"Skill file not found: {path}");
 
         var markdown = await File.ReadAllTextAsync(path, ct);
-        return Skill.FromMd(markdown);
+        return SkillParser.ParseFromMarkdown(markdown);
     }
 }

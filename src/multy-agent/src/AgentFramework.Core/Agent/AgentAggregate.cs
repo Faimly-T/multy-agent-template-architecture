@@ -7,7 +7,13 @@ using AgentFramework.Core.Agent.Steps.CODESteps;
 
 namespace AgentFramework.Core.Agent;
 
-public class AgentAggregate<TId> : ISessionWriter
+public class AgentAggregate<TId> :
+    ISessionWriter,
+    ISessionObjectiveWriter,
+    ISessionBacklogWriter,
+    IQuestionWriter,
+    ITokenConsumptionWriter,
+    IDomainEventPublisher
 {
     public TId Id { get; protected set; } = default!;
     public Role Role { get; protected set; } = default!;
@@ -24,12 +30,18 @@ public class AgentAggregate<TId> : ISessionWriter
     public IReadOnlyList<AgentStep> Steps => Pipeline.Steps;
     public bool IsCompleted => Pipeline.IsCompleted;
 
-    protected AgentAggregate() { }
+    private readonly AgentStepExecutor _executor;
+
+    protected AgentAggregate()
+    {
+        _executor = new AgentStepExecutor(_conversation, this);
+    }
 
     public AgentAggregate(TId id, Role role)
     {
         Id = id;
         Role = role;
+        _executor = new AgentStepExecutor(_conversation, this);
     }
 
     public AgentSession StartSession(string sessionObjective, int sessionIteration = 1)
@@ -37,8 +49,6 @@ public class AgentAggregate<TId> : ISessionWriter
         Session = new AgentSession(sessionObjective, sessionIteration);
         return Session;
     }
-
-    protected void RaiseDomainEvent(DomainEvent @event) => _domainEvents.Add(@event);
 
     public void ClearDomainEvents() => _domainEvents.Clear();
 
@@ -80,25 +90,13 @@ public class AgentAggregate<TId> : ISessionWriter
         if (IsCompleted)
             throw new InvalidOperationException("All steps have been completed.");
 
-        var step = Pipeline.CurrentStep;
+        if (!Pipeline.TryGetCurrentStep(out var step))
+            throw new InvalidOperationException("No current step available.");
 
-        RaiseDomainEvent(new StepStarted(step.StepNumber, step.Name, step.SkillName));
+        var result = await _executor.ExecuteStepAsync(step!, Role, Session, messageBuilder, chatClient, ct);
 
-        var messages = messageBuilder.BuildMessages(step, Role, Session, ConversationMessages);
-
-        foreach (var msg in messages)
-        {
-            if (msg.Role == MessageRole.System)
-                _conversation.AddSystemMessage(msg.Content);
-            else
-                _conversation.AddUserMessage(msg.Content);
-        }
-
-        var result = await chatClient.SendAsync(_conversation.Messages, step, ct);
-
-        _conversation.AddAssistantMessage(result.Output);
-
-        ApplyStepOutcome(step, result);
+        if (result.GateSatisfied)
+            Pipeline.Advance();
 
         return result;
     }
@@ -122,44 +120,48 @@ public class AgentAggregate<TId> : ISessionWriter
         return results.AsReadOnly();
     }
 
-    private void ApplyStepOutcome(AgentStep step, StepResult result)
+    public async Task<AgentRunResult> RunAsync(
+        string objective,
+        IChatClient chatClient,
+        ISkillProvider skillProvider,
+        IDeliverableWriter deliverableWriter,
+        IPipelineFactory pipelineFactory,
+        IStepMessageBuilder messageBuilder,
+        CancellationToken ct = default)
     {
-        if (result.GateSatisfied)
+        ClearDomainEvents();
+
+        Pipeline = await pipelineFactory.CreatePipelineAsync(Role, skillProvider, ct);
+        StartSession(objective);
+
+        var results = new List<StepResult>();
+
+        while (!IsCompleted)
         {
-            if (Session is not null)
-                result.ApplyTo(this);
+            var result = await ExecuteNextStepAsync(messageBuilder, chatClient, ct);
+            results.Add(result);
 
-            // Domain-verified gate: if the step has a verifier, override LLM's self-report
-            if (Session is not null && step.Gate.Verify is not null)
-            {
-                var verified = step.Gate.Verify(Session, result);
-                if (!verified)
-                {
-                    RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
-                    return;
-                }
-            }
-
-            if (result is ExpressResult express && express.Questions.Count > 0)
-            {
-                var newQuestions = express.Questions.Where(q =>
-                    string.Equals(q.Status, "open", StringComparison.OrdinalIgnoreCase)).ToList();
-                var reviewedCount = express.Questions.Count(q =>
-                    string.Equals(q.Status, "reviewed", StringComparison.OrdinalIgnoreCase));
-                RaiseDomainEvent(new QuestionsUpdated(newQuestions, reviewedCount));
-            }
-
-            RaiseDomainEvent(new StepCompleted(step.StepNumber, step.Name, result));
-            Pipeline.Advance();
+            if (!result.GateSatisfied)
+                break;
         }
-        else
-        {
-            RaiseDomainEvent(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
-        }
+
+        await deliverableWriter.WriteAsync(Session!, results.AsReadOnly(), ct);
+
+        return new AgentRunResult(
+            Session!,
+            results.AsReadOnly(),
+            DomainEvents,
+            IsCompleted);
     }
 
     // ==========================================================
-    // ISessionWriter — Aggregate-controlled visitor surface
+    // IDomainEventPublisher implementation
+    // ==========================================================
+
+    void IDomainEventPublisher.Publish(DomainEvent @event) => _domainEvents.Add(@event);
+
+    // ==========================================================
+    // Writer interface implementations
     // ==========================================================
 
     void ISessionWriter.UpdateObjective(string sessionObjective)
@@ -208,10 +210,30 @@ public class AgentAggregate<TId> : ISessionWriter
         {
             Session.ApplyQuestionReview(id, newStatus);
         }
-        // If question doesn't exist and status is Open, treat as a new question
         else if (newStatus == QuestionStatus.Open)
         {
             Session.RaiseQuestion(id, string.Empty, "express-relay");
         }
     }
+
+    void ISessionObjectiveWriter.UpdateObjective(string sessionObjective)
+        => ((ISessionWriter)this).UpdateObjective(sessionObjective);
+
+    void ISessionBacklogWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
+        => ((ISessionWriter)this).SetCapturedIslands(islands);
+
+    void ISessionBacklogWriter.ApplyOrganization(IReadOnlyList<IslandOrganization> organizations, IReadOnlyList<DecisionRecord> decisions)
+        => ((ISessionWriter)this).ApplyOrganization(organizations, decisions);
+
+    void ISessionBacklogWriter.ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables)
+        => ((ISessionWriter)this).ApplyDistillation(distillations, deliverables);
+
+    void IQuestionWriter.RaiseQuestion(string id, string text, string source)
+        => ((ISessionWriter)this).RaiseQuestion(id, text, source);
+
+    void IQuestionWriter.ReviewQuestion(string id, QuestionStatus newStatus)
+        => ((ISessionWriter)this).ReviewQuestion(id, newStatus);
+
+    void ITokenConsumptionWriter.UpdateTokenConsumption(int inputTokens, int outputTokens)
+        => ((ISessionWriter)this).UpdateTokenConsumption(inputTokens, outputTokens);
 }

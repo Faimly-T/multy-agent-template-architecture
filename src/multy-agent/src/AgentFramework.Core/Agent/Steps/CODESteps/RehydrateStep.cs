@@ -151,8 +151,8 @@ public record RehydrateResult(
     bool IsInitialSession = false,
     IReadOnlyList<RehydrateBlocker>? Blockers = null) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(ISessionWriter writer)
+    public override void ApplyTo(AgentSession session)
     {
-        writer.UpdateObjective(SessionObjective);
+        session.UpdateObjective(SessionObjective);
     }
 }

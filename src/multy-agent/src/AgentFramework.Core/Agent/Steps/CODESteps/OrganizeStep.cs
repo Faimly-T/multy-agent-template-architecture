@@ -74,9 +74,12 @@ public record OrganizeResult(
     IReadOnlyList<IslandOrganization> OrganizedIslands,
     IReadOnlyList<DecisionRecord> Decisions) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(ISessionWriter writer)
+    public override void ApplyTo(AgentSession session)
     {
-        writer.ApplyOrganization(OrganizedIslands, Decisions);
+        session.Backlog.ApplyOrganization(OrganizedIslands);
+
+        foreach (var dec in Decisions)
+            session.RecordDecision(dec.Id, dec.Description, dec.Impact);
     }
 }
 

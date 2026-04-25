@@ -9,7 +9,7 @@ public class RoleTests
     private static Role LoadRole()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return Role.FromMd(markdown);
+        return RoleParser.ParseFromMarkdown(markdown);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class RoleTests
     {
         var role = LoadRole();
         var exported = role.ToMd();
-        var reparsed = Role.FromMd(exported);
+        var reparsed = RoleParser.ParseFromMarkdown(exported);
 
         Assert.Equal(role.Name, reparsed.Name);
     }
@@ -91,7 +91,7 @@ public class RoleTests
     {
         var role = LoadRole();
         var exported = role.ToMd();
-        var reparsed = Role.FromMd(exported);
+        var reparsed = RoleParser.ParseFromMarkdown(exported);
 
         Assert.Equal(role.Mandate, reparsed.Mandate);
     }
@@ -101,7 +101,7 @@ public class RoleTests
     {
         var role = LoadRole();
         var exported = role.ToMd();
-        var reparsed = Role.FromMd(exported);
+        var reparsed = RoleParser.ParseFromMarkdown(exported);
 
         Assert.Equal(role.FactsAndDirectives.Count, reparsed.FactsAndDirectives.Count);
     }

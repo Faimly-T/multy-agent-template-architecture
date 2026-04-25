@@ -10,7 +10,7 @@ internal static class TestSteps
         UxStepBuilder.Create().WithSteps(DefaultSteps()).WithSkills(DefaultSkills()).Build();
 
     public static IEnumerable<Skill> DefaultSkills() =>
-        DefaultSteps().Select(s => Skill.FromMd(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
+        DefaultSteps().Select(s => SkillParser.ParseFromMarkdown(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
 
     public static AgentStep[] DefaultSteps() =>
     [

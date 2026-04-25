@@ -83,9 +83,12 @@ public record DistillResult(
     IReadOnlyList<IslandDistillation> DistilledIslands,
     IReadOnlyList<DeliverableRecord> Deliverables) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(ISessionWriter writer)
+    public override void ApplyTo(AgentSession session)
     {
-        writer.ApplyDistillation(DistilledIslands, Deliverables);
+        session.Backlog.ApplyDistillation(DistilledIslands);
+
+        foreach (var del in Deliverables)
+            session.RecordDeliverable(del.DeliverableId, del.Path, del.Status);
     }
 }
 

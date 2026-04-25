@@ -16,7 +16,7 @@ public class SkillConversationTests
     {
         var markdown = File.ReadAllText(TestDataPath);
         var skills = TestSteps.DefaultSkills();
-        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), skills);
+        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), skills);
     }
 
     // --- Skill loading ---
@@ -26,7 +26,7 @@ public class SkillConversationTests
     {
         var md = File.ReadAllText("TestData/Skills/rehydrate-context.md");
 
-        var skill = Skill.FromMd(md);
+        var skill = SkillParser.ParseFromMarkdown(md);
 
         Assert.Equal("rehydrate-context", skill.Name);
         Assert.Equal("Define objective for agent and reconstruct session from prior state.", skill.Description);
@@ -53,7 +53,7 @@ public class SkillConversationTests
         var markdownRehydrate = File.ReadAllText("TestData/Skills/rehydrate-context.md");
 
         // Re-attach skill via internal AttachSkill — step number and gate are preserved
-        agent.Steps[0].AttachSkill(Skill.FromMd(markdownRehydrate));
+        agent.Steps[0].AttachSkill(SkillParser.ParseFromMarkdown(markdownRehydrate));
 
         Assert.Equal(5, agent.Steps.Count);
         Assert.Equal(1, agent.Steps[0].StepNumber);

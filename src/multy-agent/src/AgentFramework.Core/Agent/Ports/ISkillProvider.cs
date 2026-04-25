@@ -1,6 +1,8 @@
+using AgentFramework.Core.Agent.Steps;
+
 namespace AgentFramework.Core.Agent.Ports;
 
 public interface ISkillProvider
 {
-    Task<Steps.Skill> LoadAsync(string skillName, CancellationToken ct = default);
+    Task<Skill> LoadAsync(string skillName, CancellationToken ct = default);
 }

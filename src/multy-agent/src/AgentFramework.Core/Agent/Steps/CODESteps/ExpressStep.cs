@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
@@ -95,9 +96,9 @@ public record ExpressResult(
     int OutputTokens,
     IReadOnlyList<QuestionRecord> Questions) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(ISessionWriter writer)
+    public override void ApplyTo(AgentSession session)
     {
-        writer.UpdateTokenConsumption(InputTokens, OutputTokens);
+        session.UpdateTokenConsumption(InputTokens, OutputTokens);
 
         foreach (var q in Questions)
         {
@@ -107,13 +108,24 @@ public record ExpressResult(
 
             if (status == QuestionStatus.Open)
             {
-                writer.RaiseQuestion(q.Id, q.Text, "express-relay");
+                session.RaiseQuestion(q.Id, q.Text, "express-relay");
             }
             else
             {
-                writer.ReviewQuestion(q.Id, status);
+                session.ApplyQuestionReview(q.Id, status);
             }
         }
+    }
+
+    public override IEnumerable<DomainEvent> GetDomainEvents()
+    {
+        var newQuestions = Questions.Where(q =>
+            string.Equals(q.Status, "open", StringComparison.OrdinalIgnoreCase)).ToList();
+        var reviewedCount = Questions.Count(q =>
+            string.Equals(q.Status, "reviewed", StringComparison.OrdinalIgnoreCase));
+
+        if (newQuestions.Any() || reviewedCount > 0)
+            yield return new QuestionsUpdated(newQuestions, reviewedCount);
     }
 }
 

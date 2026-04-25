@@ -57,9 +57,9 @@ public record CaptureResult(
     bool GateSatisfied,
     IReadOnlyList<CapturedIsland> Islands) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(ISessionWriter writer)
+    public override void ApplyTo(AgentSession session)
     {
-        writer.SetCapturedIslands(Islands);
+        session.Backlog.SetCaptured(Islands);
     }
 }
 

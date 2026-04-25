@@ -16,7 +16,7 @@ public class QuestionTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(Role.FromMd(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
     }
 
     // ==========================================================
@@ -171,7 +171,7 @@ public class QuestionTests
             OutputTokens: 200,
             Questions: [new QuestionRecord("UX-Q001", "What scope?", "open")]);
 
-        result.ApplyTo((ISessionWriter)agent);
+        result.ApplyTo(agent.Session!);
 
         Assert.Single(agent.Session!.Questions);
         Assert.Equal("UX-Q001", agent.Session.Questions[0].Id);
@@ -193,7 +193,7 @@ public class QuestionTests
             OutputTokens: 200,
             Questions: [new QuestionRecord("UX-Q001", "What scope?", "reviewed")]);
 
-        result.ApplyTo((ISessionWriter)agent);
+        result.ApplyTo(agent.Session!);
 
         Assert.Equal(QuestionStatus.Reviewed, agent.Session!.Questions[0].Status);
     }
@@ -212,7 +212,7 @@ public class QuestionTests
             OutputTokens: 200,
             Questions: [new QuestionRecord("UX-Q001", "Old question", "obsolete")]);
 
-        result.ApplyTo((ISessionWriter)agent);
+        result.ApplyTo(agent.Session!);
 
         Assert.Equal(QuestionStatus.Obsolete, agent.Session!.Questions[0].Status);
     }
@@ -231,7 +231,7 @@ public class QuestionTests
                 new QuestionRecord("UX-Q001", "Question 1", "open"),
                 new QuestionRecord("UX-Q002", "Question 2", "open")]);
 
-        result.ApplyTo((ISessionWriter)agent);
+        result.ApplyTo(agent.Session!);
 
         Assert.Equal(1500, agent.Session!.Checkpoint.TokensConsumption.InputTokens);
         Assert.Equal(3000, agent.Session.Checkpoint.TokensConsumption.OutputTokens);
