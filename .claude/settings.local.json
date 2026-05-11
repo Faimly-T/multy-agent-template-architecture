@@ -14,7 +14,10 @@
       "Bash(BASE=\"/c/Users/ing_m/OneDrive/Documentos/2nd Brain/2026/Projects/Design AI Planning Agent Team for Knowledge Capture \\(Po - PjM - Architect\\)/Agent-WorkFlow-PO-PjM-Architect V2/.claude/skills\")",
       "Bash(__NEW_LINE_4bb2b8e329810fbd__ for:*)",
       "Bash(do)",
-      "Bash(FILE=\"$BASE/$skill/SKILL.md\")"
+      "Bash(FILE=\"$BASE/$skill/SKILL.md\")",
+      "mcp__claude_ai_Microsoft_Learn__microsoft_docs_search",
+      "mcp__claude_ai_Microsoft_Learn__microsoft_code_sample_search",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\\" -Recurse -Directory | Select-Object FullName)"
     ]
   }
 }
