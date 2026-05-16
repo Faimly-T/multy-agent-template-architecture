@@ -27,8 +27,9 @@ public class OrganizeStep : AgentStep
         }
         """;
 
-    public override string BuildContext(AgentSession? session)
+    public override string BuildContext(IAgentRunContext? context)
     {
+        var session = context?.Session;
         if (session is null || session.Backlog.Count == 0)
             return "Current Islands: None captured yet";
 
@@ -74,12 +75,9 @@ public record OrganizeResult(
     IReadOnlyList<IslandOrganization> OrganizedIslands,
     IReadOnlyList<DecisionRecord> Decisions) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        session.Backlog.ApplyOrganization(OrganizedIslands);
-
-        foreach (var dec in Decisions)
-            session.RecordDecision(dec.Id, dec.Description, dec.Impact);
+        writer.ApplyOrganization(OrganizedIslands, Decisions);
     }
 }
 

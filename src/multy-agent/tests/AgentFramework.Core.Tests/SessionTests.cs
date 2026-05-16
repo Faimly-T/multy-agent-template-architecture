@@ -8,6 +8,7 @@ namespace AgentFramework.Core.Tests;
 public class SessionTests
 {
     private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
     private static UxPersona CreateAgent()
     {
@@ -18,58 +19,58 @@ public class SessionTests
     // --- Checkpoint ---
 
     [Fact]
-    public void StartSession_CreatesSessionWithObjective()
+    public void OpenSession_CreatesSessionWithObjective()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("Define personas for recruiting platform");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "Define personas for recruiting platform");
 
         Assert.NotNull(session);
-        Assert.Equal("Define personas for recruiting platform", session.Checkpoint.SessionObjective);
-        Assert.Equal(1, session.Checkpoint.SessionIteration);
+        Assert.Equal("Define personas for recruiting platform", session.CurrentCheckpoint!.SessionObjective);
+        Assert.Equal(1, session.CurrentCheckpoint!.SessionIteration);
     }
 
     [Fact]
-    public void StartSession_SetsDateToUtcNow()
+    public void OpenSession_SetsDateToUtcNow()
     {
         var agent = CreateAgent();
         var before = DateTime.UtcNow;
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         var after = DateTime.UtcNow;
 
-        Assert.InRange(session.Checkpoint.Date, before, after);
+        Assert.InRange(session.CurrentCheckpoint!.Date, before, after);
     }
 
     [Fact]
-    public void StartSession_InitializesTokenConsumptionToZero()
+    public void OpenSession_InitializesTokenConsumptionToZero()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
-        Assert.Equal(0, session.Checkpoint.TokensConsumption.InputTokens);
-        Assert.Equal(0, session.Checkpoint.TokensConsumption.OutputTokens);
-        Assert.Equal(0, session.Checkpoint.TokensConsumption.TotalTokens);
+        Assert.Equal(0, session.CurrentCheckpoint!.TokensConsumption.InputTokens);
+        Assert.Equal(0, session.CurrentCheckpoint!.TokensConsumption.OutputTokens);
+        Assert.Equal(0, session.CurrentCheckpoint!.TokensConsumption.TotalTokens);
     }
 
     [Fact]
     public void UpdateTokenConsumption_UpdatesCheckpoint()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
-        session.UpdateTokenConsumption(1500, 3000);
+        ((ISessionWriter)agent).UpdateTokenConsumption(1500, 3000);
 
-        Assert.Equal(1500, session.Checkpoint.TokensConsumption.InputTokens);
-        Assert.Equal(3000, session.Checkpoint.TokensConsumption.OutputTokens);
-        Assert.Equal(4500, session.Checkpoint.TokensConsumption.TotalTokens);
+        Assert.Equal(1500, session.CurrentCheckpoint!.TokensConsumption.InputTokens);
+        Assert.Equal(3000, session.CurrentCheckpoint!.TokensConsumption.OutputTokens);
+        Assert.Equal(4500, session.CurrentCheckpoint!.TokensConsumption.TotalTokens);
     }
 
     [Fact]
-    public void StartSession_WithCustomIteration()
+    public void OpenSession_IterationStartsAt1()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("Continue personas", sessionIteration: 3);
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "Continue personas");
 
-        Assert.Equal(3, session.Checkpoint.SessionIteration);
+        Assert.Equal(1, session.CurrentCheckpoint!.SessionIteration);
     }
 
     // --- Islands (via IslandBacklog) ---
@@ -78,7 +79,7 @@ public class SessionTests
     public void SetCaptured_AddsIslandsWithCapturedStatus()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Student athlete seeking recruitment", "product description")
@@ -97,7 +98,7 @@ public class SessionTests
     public void SetCaptured_PreservesRelatesToIslandId()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
@@ -112,7 +113,7 @@ public class SessionTests
     public void Backlog_StatusTransitions_CapturedToOrganizedToDistilled()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.PainPoint, "No visibility", "interview")
         ]);
@@ -130,7 +131,7 @@ public class SessionTests
     public void Backlog_CanDiscardDuringOrganize()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.AntiUser, "Tourist", "capture"),
             new CapturedIsland("ISL-002", IslandType.UserType, "Athlete", "capture")
@@ -151,7 +152,7 @@ public class SessionTests
     public void Backlog_ApplyOrganization_ThrowsOnInvalidTransition_OrganizedToOrganized()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
@@ -165,7 +166,7 @@ public class SessionTests
     public void Backlog_ApplyDistillation_ThrowsWhenNotOrganized()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
@@ -178,7 +179,7 @@ public class SessionTests
     public void Backlog_ApplyOrganization_ThrowsWhenAlreadyDiscarded()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
             new CapturedIsland("ISL-002", IslandType.Goal, "Keep", "desc")
@@ -196,7 +197,7 @@ public class SessionTests
     public void Backlog_ApplyDistillation_ThrowsWhenAlreadyDistilled()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
@@ -213,7 +214,7 @@ public class SessionTests
     public void SessionWriter_SetCapturedIslands_ThrowsOnDuplicateIds()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         var writer = (ISessionWriter)agent;
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -227,7 +228,7 @@ public class SessionTests
     public void SessionWriter_RaiseQuestion_ThrowsOnDuplicateId()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         var writer = (ISessionWriter)agent;
 
         writer.RaiseQuestion("Q-001", "First", "express-relay");
@@ -240,7 +241,7 @@ public class SessionTests
     public void SessionWriter_ApplyOrganization_ThrowsOnMissingIsland()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         var writer = (ISessionWriter)agent;
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -253,7 +254,7 @@ public class SessionTests
     public void Backlog_Find_ReturnsCorrectIsland()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
             new CapturedIsland("ISL-002", IslandType.Stakeholder, "Coach", "desc")
@@ -269,56 +270,65 @@ public class SessionTests
     public void Backlog_Find_ReturnsNull_WhenNotFound()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
         Assert.Null(session.Backlog.Find("NONEXISTENT"));
     }
 
-    // --- Deliverables ---
+    // --- Deliverables (via ISessionWriter) ---
 
     [Fact]
-    public void RecordDeliverable_AddsDeliverable()
+    public void ApplyDistillation_AddsDeliverable()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
-        session.RecordDeliverable("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete);
+        ((ISessionWriter)agent).ApplyDistillation([], [
+            new DeliverableRecord("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)
+        ]);
 
-        Assert.Single(session.Deliverables);
-        var d = session.Deliverables[0];
+        Assert.Single(agent.Deliverables);
+        var d = agent.Deliverables[0];
         Assert.Equal("DEL-001", d.DeliverableId);
         Assert.Equal("outputs/personas/01-athlete.md", d.Path);
         Assert.Equal(DeliverableStatus.Complete, d.Status);
     }
 
     [Fact]
-    public void RecordDeliverable_SupportsAllStatuses()
+    public void ApplyDistillation_SupportsAllStatuses()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
-        session.RecordDeliverable("D1", "path/draft.md", DeliverableStatus.Draft);
-        session.RecordDeliverable("D2", "path/partial.md", DeliverableStatus.Partial);
-        session.RecordDeliverable("D3", "path/done.md", DeliverableStatus.Complete);
+        ((ISessionWriter)agent).ApplyDistillation([], [
+            new DeliverableRecord("D1", "path/draft.md", DeliverableStatus.Draft),
+            new DeliverableRecord("D2", "path/partial.md", DeliverableStatus.Partial),
+            new DeliverableRecord("D3", "path/done.md", DeliverableStatus.Complete)
+        ]);
 
-        Assert.Equal(3, session.Deliverables.Count);
-        Assert.Equal(DeliverableStatus.Draft, session.Deliverables[0].Status);
-        Assert.Equal(DeliverableStatus.Partial, session.Deliverables[1].Status);
-        Assert.Equal(DeliverableStatus.Complete, session.Deliverables[2].Status);
+        Assert.Equal(3, agent.Deliverables.Count);
+        Assert.Equal(DeliverableStatus.Draft, agent.Deliverables[0].Status);
+        Assert.Equal(DeliverableStatus.Partial, agent.Deliverables[1].Status);
+        Assert.Equal(DeliverableStatus.Complete, agent.Deliverables[2].Status);
     }
 
-    // --- Decisions ---
+    // --- Decisions (via ISessionWriter) ---
 
     [Fact]
-    public void RecordDecision_AddsDecision()
+    public void ApplyOrganization_AddsDecision()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("objective");
+        var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
+        session.Backlog.SetCaptured([
+            new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
+        ]);
 
-        session.RecordDecision("DEC-001", "Merge athlete and recruit into one persona", "Reduces persona count from 4 to 3");
+        ((ISessionWriter)agent).ApplyOrganization(
+            [new IslandOrganization("ISL-001", IslandStatus.Organized)],
+            [new DecisionRecord("DEC-001", "Merge athlete and recruit into one persona", "Reduces persona count from 4 to 3")]);
 
-        Assert.Single(session.Decisions);
-        var dec = session.Decisions[0];
+        Assert.Single(agent.Decisions);
+        var dec = agent.Decisions[0];
         Assert.Equal("DEC-001", dec.Id);
         Assert.Equal("Merge athlete and recruit into one persona", dec.Description);
         Assert.Equal("Reduces persona count from 4 to 3", dec.Impact);
@@ -337,24 +347,24 @@ public class SessionTests
     public void Agent_SessionIsAccessible_AfterStart()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
         Assert.NotNull(agent.Session);
         Assert.Same(agent.Session, agent.Session);
     }
 
     [Fact]
-    public void StartSession_ReplacesExistingSession()
+    public void OpenSession_ReplacesExistingSession()
     {
         var agent = CreateAgent();
-        var first = agent.StartSession("first objective");
+        var first = agent.OpenSession("test-proj", TestMarkFilePaths, "first objective");
         first.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
 
-        var second = agent.StartSession("second objective", sessionIteration: 2);
+        var second = agent.OpenSession("test-proj", TestMarkFilePaths, "second objective");
 
         Assert.Empty(second.Backlog.All);
-        Assert.Equal("second objective", second.Checkpoint.SessionObjective);
+        Assert.Equal("second objective", second.CurrentCheckpoint!.SessionObjective);
     }
 }

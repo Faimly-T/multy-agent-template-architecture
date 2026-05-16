@@ -23,9 +23,9 @@ public class CaptureStep : AgentStep
         }
         """;
 
-    public override string BuildContext(AgentSession? session)
+    public override string BuildContext(IAgentRunContext? context)
     {
-        var objective = session?.Checkpoint.SessionObjective ?? "No objective";
+        var objective = context?.Session?.CurrentCheckpoint?.SessionObjective ?? "No objective";
         return $"Session Objective: {objective}";
     }
 
@@ -57,9 +57,9 @@ public record CaptureResult(
     bool GateSatisfied,
     IReadOnlyList<CapturedIsland> Islands) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        session.Backlog.SetCaptured(Islands);
+        writer.SetCapturedIslands(Islands);
     }
 }
 

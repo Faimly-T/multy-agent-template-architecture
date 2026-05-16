@@ -2,80 +2,53 @@ namespace AgentFramework.Core.Agent.Session;
 
 public class AgentSession
 {
-    public Checkpoint Checkpoint { get; private set; }
+    public string ProjectId { get; private set; }
+    public SessionMarkFilePaths MarkFilePaths { get; private set; }
+
+    private readonly List<Checkpoint> _checkpoints = [];
+    public IReadOnlyList<Checkpoint> Checkpoints => _checkpoints.AsReadOnly();
+    public Checkpoint? CurrentCheckpoint => _checkpoints.Count > 0 ? _checkpoints[^1] : null;
 
     public IslandBacklog Backlog { get; } = new();
-
-    // Convenience accessor — delegates to Backlog for backward-compatible reads
     public IReadOnlyList<Island> Islands => Backlog.All;
 
-    private readonly List<Deliverable> _deliverables = [];
-    public IReadOnlyList<Deliverable> Deliverables => _deliverables.AsReadOnly();
+    public SessionHistory? History { get; private set; }
 
-    private readonly List<Decision> _decisions = [];
-    public IReadOnlyList<Decision> Decisions => _decisions.AsReadOnly();
-
-    private readonly List<Question> _questions = [];
-    public IReadOnlyList<Question> Questions => _questions.AsReadOnly();
-
-    public AgentSession(string sessionObjective, int sessionIteration = 1)
+    public AgentSession(string projectId, SessionMarkFilePaths markFilePaths)
     {
-        Checkpoint = new Checkpoint(
-            Date: DateTime.UtcNow,
-            SessionIteration: sessionIteration,
-            SessionObjective: sessionObjective,
-            TokensConsumption: new TokenConsumption(0, 0));
+        ProjectId = projectId;
+        MarkFilePaths = markFilePaths;
     }
 
-    // --- Checkpoint ---
+    // --- Iteration lifecycle ---
+
+    internal Checkpoint BeginIteration(string objective)
+    {
+        var cp = new Checkpoint(
+            Date: DateTime.UtcNow,
+            SessionIteration: _checkpoints.Count + 1,
+            SessionObjective: objective,
+            TokensConsumption: new TokenConsumption(0, 0));
+        _checkpoints.Add(cp);
+        return cp;
+    }
 
     internal void UpdateObjective(string sessionObjective)
     {
-        Checkpoint = Checkpoint with { SessionObjective = sessionObjective };
+        if (_checkpoints.Count == 0) return;
+        _checkpoints[^1] = _checkpoints[^1] with { SessionObjective = sessionObjective };
     }
 
     internal void UpdateTokenConsumption(int inputTokens, int outputTokens)
     {
-        Checkpoint = Checkpoint with
+        if (_checkpoints.Count == 0) return;
+        _checkpoints[^1] = _checkpoints[^1] with
         {
             TokensConsumption = new TokenConsumption(inputTokens, outputTokens)
         };
     }
 
-    // --- Deliverables ---
+    // --- History ---
 
-    internal void RecordDeliverable(string deliverableId, string path, DeliverableStatus status)
-    {
-        _deliverables.Add(new Deliverable(deliverableId, path, status));
-    }
-
-    // --- Decisions ---
-
-    internal void RecordDecision(string id, string description, string impact)
-    {
-        _decisions.Add(new Decision(id, description, impact));
-    }
-
-    // --- Questions ---
-
-    internal Question RaiseQuestion(string id, string text, string source)
-    {
-        var question = new Question(id, text, source);
-        _questions.Add(question);
-        return question;
-    }
-
-    internal void ApplyQuestionReview(string id, QuestionStatus newStatus)
-    {
-        var question = FindQuestion(id);
-        if (question is null) return;
-
-        switch (newStatus)
-        {
-            case QuestionStatus.Reviewed: question.MarkReviewed(); break;
-            case QuestionStatus.Obsolete: question.MarkObsolete(); break;
-        }
-    }
-
-    internal Question? FindQuestion(string id) => _questions.Find(q => q.Id == id);
+    internal void LoadHistory(SessionHistory history) => History = history;
 }

@@ -8,4 +8,7 @@ public record AgentRunResult(
     AgentSession Session,
     IReadOnlyList<StepResult> StepResults,
     IReadOnlyList<DomainEvent> DomainEvents,
-    bool Completed);
+    bool Completed,
+    IReadOnlyList<Question> Questions,
+    IReadOnlyList<Decision> Decisions,
+    IReadOnlyList<Deliverable> Deliverables);

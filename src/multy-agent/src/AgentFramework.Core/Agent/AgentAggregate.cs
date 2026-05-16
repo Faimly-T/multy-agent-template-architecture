@@ -13,7 +13,8 @@ public class AgentAggregate<TId> :
     ISessionBacklogWriter,
     IQuestionWriter,
     ITokenConsumptionWriter,
-    IDomainEventPublisher
+    IDomainEventPublisher,
+    IAgentRunContext
 {
     public TId Id { get; protected set; } = default!;
     public Role Role { get; protected set; } = default!;
@@ -32,6 +33,16 @@ public class AgentAggregate<TId> :
 
     private readonly AgentStepExecutor _executor;
 
+    // --- Domain outputs (moved from AgentSession) ---
+
+    private readonly List<Question> _questions = [];
+    private readonly List<Decision> _decisions = [];
+    private readonly List<Deliverable> _deliverables = [];
+
+    public IReadOnlyList<Question> Questions => _questions.AsReadOnly();
+    public IReadOnlyList<Decision> Decisions => _decisions.AsReadOnly();
+    public IReadOnlyList<Deliverable> Deliverables => _deliverables.AsReadOnly();
+
     protected AgentAggregate()
     {
         _executor = new AgentStepExecutor(_conversation, this);
@@ -44,9 +55,13 @@ public class AgentAggregate<TId> :
         _executor = new AgentStepExecutor(_conversation, this);
     }
 
-    public AgentSession StartSession(string sessionObjective, int sessionIteration = 1)
+    // --- Session lifecycle ---
+
+    public AgentSession OpenSession(string projectId, SessionMarkFilePaths markFilePaths, string initialObjective = "")
     {
-        Session = new AgentSession(sessionObjective, sessionIteration);
+        Session = new AgentSession(projectId, markFilePaths);
+        if (!string.IsNullOrEmpty(initialObjective))
+            Session.BeginIteration(initialObjective);
         return Session;
     }
 
@@ -55,11 +70,10 @@ public class AgentAggregate<TId> :
     // --- Question Queries ---
 
     public IReadOnlyList<Question> GetQuestions()
-        => Session?.Questions ?? [];
+        => _questions.AsReadOnly();
 
     public IReadOnlyList<Question> GetQuestions(QuestionStatus status)
-        => Session?.Questions.Where(q => q.Status == status).ToList().AsReadOnly()
-           ?? [];
+        => _questions.Where(q => q.Status == status).ToList().AsReadOnly();
 
     public IReadOnlyList<Question> GetOpenQuestions()
         => GetQuestions(QuestionStatus.Open);
@@ -67,16 +81,24 @@ public class AgentAggregate<TId> :
     public IReadOnlyList<Question> GetPendingReviewQuestions()
         => GetQuestions(QuestionStatus.Answered);
 
+    public Question? FindQuestion(string id) => _questions.Find(q => q.Id == id);
+
+    public void RaiseQuestion(string id, string text, string source)
+        => ((ISessionWriter)this).RaiseQuestion(id, text, source);
+
+    public void ApplyQuestionReview(string id, QuestionStatus newStatus)
+        => ((ISessionWriter)this).ReviewQuestion(id, newStatus);
+
     // --- Supply Answers (between sessions) ---
 
     public void SupplyAnswers(IReadOnlyList<(string QuestionId, string Answer, string AnswerSource)> answers)
     {
         if (Session is null)
-            throw new InvalidOperationException("No active session. Start a session before supplying answers.");
+            throw new InvalidOperationException("No active session. Open a session before supplying answers.");
 
         foreach (var (questionId, answer, answerSource) in answers)
         {
-            var question = Session.FindQuestion(questionId)
+            var question = FindQuestion(questionId)
                 ?? throw new InvalidOperationException($"Question '{questionId}' not found.");
             question.SetAnswer(answer, answerSource);
         }
@@ -93,7 +115,7 @@ public class AgentAggregate<TId> :
         if (!Pipeline.TryGetCurrentStep(out var step))
             throw new InvalidOperationException("No current step available.");
 
-        var result = await _executor.ExecuteStepAsync(step!, Role, Session, messageBuilder, chatClient, ct);
+        var result = await _executor.ExecuteStepAsync(step!, Role, this, this, messageBuilder, chatClient, ct);
 
         if (result.GateSatisfied)
             Pipeline.Advance();
@@ -129,10 +151,13 @@ public class AgentAggregate<TId> :
         IStepMessageBuilder messageBuilder,
         CancellationToken ct = default)
     {
+        if (Session is null)
+            throw new InvalidOperationException("Call OpenSession before RunAsync.");
+
         ClearDomainEvents();
 
         Pipeline = await pipelineFactory.CreatePipelineAsync(Role, skillProvider, ct);
-        StartSession(objective);
+        Session.BeginIteration(objective);
 
         var results = new List<StepResult>();
 
@@ -145,76 +170,130 @@ public class AgentAggregate<TId> :
                 break;
         }
 
-        await deliverableWriter.WriteAsync(Session!, results.AsReadOnly(), ct);
+        await deliverableWriter.WriteAsync(this, results.AsReadOnly(), ct);
 
         return new AgentRunResult(
             Session!,
             results.AsReadOnly(),
             DomainEvents,
-            IsCompleted);
+            IsCompleted,
+            Questions,
+            Decisions,
+            Deliverables);
     }
 
     // ==========================================================
-    // IDomainEventPublisher implementation
+    // IAgentRunContext
+    // ==========================================================
+
+    AgentSession? IAgentRunContext.Session => Session;
+    IReadOnlyList<Question> IAgentRunContext.Questions => _questions.AsReadOnly();
+    IReadOnlyList<Decision> IAgentRunContext.Decisions => _decisions.AsReadOnly();
+    IReadOnlyList<Deliverable> IAgentRunContext.Deliverables => _deliverables.AsReadOnly();
+
+    // ==========================================================
+    // IDomainEventPublisher
     // ==========================================================
 
     void IDomainEventPublisher.Publish(DomainEvent @event) => _domainEvents.Add(@event);
 
     // ==========================================================
-    // Writer interface implementations
+    // ISessionWriter
     // ==========================================================
 
     void ISessionWriter.UpdateObjective(string sessionObjective)
     {
-        Session!.UpdateObjective(sessionObjective);
+        Session?.UpdateObjective(sessionObjective);
     }
 
     void ISessionWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
     {
-        Session!.Backlog.SetCaptured(islands);
+        Session?.Backlog.SetCaptured(islands);
     }
 
     void ISessionWriter.ApplyOrganization(IReadOnlyList<IslandOrganization> organizations, IReadOnlyList<DecisionRecord> decisions)
     {
-        Session!.Backlog.ApplyOrganization(organizations);
+        Session?.Backlog.ApplyOrganization(organizations);
 
         foreach (var dec in decisions)
-            Session.RecordDecision(dec.Id, dec.Description, dec.Impact);
+            _decisions.Add(new Decision(dec.Id, dec.Description, dec.Impact));
     }
 
     void ISessionWriter.ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables)
     {
-        Session!.Backlog.ApplyDistillation(distillations);
+        Session?.Backlog.ApplyDistillation(distillations);
 
         foreach (var del in deliverables)
-            Session.RecordDeliverable(del.DeliverableId, del.Path, del.Status);
+            _deliverables.Add(new Deliverable(del.DeliverableId, del.Path, del.Status));
     }
 
     void ISessionWriter.UpdateTokenConsumption(int inputTokens, int outputTokens)
     {
-        Session!.UpdateTokenConsumption(inputTokens, outputTokens);
+        Session?.UpdateTokenConsumption(inputTokens, outputTokens);
     }
 
-    void ISessionWriter.RaiseQuestion(string id, string text, string source)
-    {
-        if (Session!.FindQuestion(id) is not null)
-            throw new InvalidOperationException($"Question '{id}' already exists in this session.");
+    // ==========================================================
+    // IQuestionWriter
+    // ==========================================================
 
-        Session.RaiseQuestion(id, text, source);
+    void IQuestionWriter.RaiseQuestion(string id, string text, string source)
+    {
+        if (FindQuestion(id) is not null)
+            throw new InvalidOperationException($"Question '{id}' already exists.");
+
+        _questions.Add(new Question(id, text, source));
     }
 
-    void ISessionWriter.ReviewQuestion(string id, QuestionStatus newStatus)
+    void IQuestionWriter.ReviewQuestion(string id, QuestionStatus newStatus)
     {
-        var existing = Session!.FindQuestion(id);
+        var existing = FindQuestion(id);
         if (existing is not null)
         {
-            Session.ApplyQuestionReview(id, newStatus);
+            switch (newStatus)
+            {
+                case QuestionStatus.Reviewed: existing.MarkReviewed(); break;
+                case QuestionStatus.Obsolete: existing.MarkObsolete(); break;
+            }
         }
         else if (newStatus == QuestionStatus.Open)
         {
-            Session.RaiseQuestion(id, string.Empty, "express-relay");
+            _questions.Add(new Question(id, string.Empty, "express-relay"));
         }
     }
+
+    void IQuestionWriter.RestoreQuestion(string id, string text, string source, QuestionStatus status,
+        string? answer, string? answerSource)
+    {
+        if (FindQuestion(id) is not null) return;
+
+        var question = new Question(id, text, source);
+        _questions.Add(question);
+
+        switch (status)
+        {
+            case QuestionStatus.Answered:
+                question.SetAnswer(answer ?? "restored", answerSource ?? "restored");
+                break;
+            case QuestionStatus.Reviewed:
+                question.SetAnswer(answer ?? "restored", answerSource ?? "restored");
+                question.MarkReviewed();
+                break;
+            case QuestionStatus.Obsolete:
+                question.MarkObsolete();
+                break;
+        }
+    }
+
+    void IQuestionWriter.AnswerQuestion(string id, string answer, string answerSource)
+    {
+        var question = FindQuestion(id);
+        if (question?.Status == QuestionStatus.Open)
+            question.SetAnswer(answer, answerSource);
+    }
+
+    // ==========================================================
+    // Sub-interface forwarding
+    // ==========================================================
 
     void ISessionObjectiveWriter.UpdateObjective(string sessionObjective)
         => ((ISessionWriter)this).UpdateObjective(sessionObjective);
@@ -227,12 +306,6 @@ public class AgentAggregate<TId> :
 
     void ISessionBacklogWriter.ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables)
         => ((ISessionWriter)this).ApplyDistillation(distillations, deliverables);
-
-    void IQuestionWriter.RaiseQuestion(string id, string text, string source)
-        => ((ISessionWriter)this).RaiseQuestion(id, text, source);
-
-    void IQuestionWriter.ReviewQuestion(string id, QuestionStatus newStatus)
-        => ((ISessionWriter)this).ReviewQuestion(id, newStatus);
 
     void ITokenConsumptionWriter.UpdateTokenConsumption(int inputTokens, int outputTokens)
         => ((ISessionWriter)this).UpdateTokenConsumption(inputTokens, outputTokens);

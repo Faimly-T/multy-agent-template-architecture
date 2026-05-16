@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
@@ -11,6 +12,7 @@ namespace AgentFramework.Core.Tests;
 public class SessionMappingTests
 {
     private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
     private static UxPersona CreateAgent()
     {
@@ -24,13 +26,13 @@ public class SessionMappingTests
     public async Task Step1_RehydrateResult_MapsSessionObjective()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-project", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
     }
 
     // --- Step 2: Capture → maps Islands ---
@@ -39,13 +41,11 @@ public class SessionMappingTests
     public async Task Step2_CaptureResult_MapsIslandsToSession()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        // Step 1
         await agent.ExecuteNextStepAsync(builder, client);
-        // Step 2
         await agent.ExecuteNextStepAsync(builder, client);
 
         Assert.Equal(3, agent.Session!.Islands.Count);
@@ -58,7 +58,7 @@ public class SessionMappingTests
     public async Task Step2_CaptureResult_MapsIslandRelations()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
@@ -75,7 +75,7 @@ public class SessionMappingTests
     public async Task Step3_OrganizeResult_UpdatesIslandStatuses()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
@@ -92,7 +92,7 @@ public class SessionMappingTests
     public async Task Step3_OrganizeResult_RecordsDecisions()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
@@ -100,9 +100,9 @@ public class SessionMappingTests
         await agent.ExecuteNextStepAsync(builder, client);
         await agent.ExecuteNextStepAsync(builder, client);
 
-        Assert.Single(agent.Session!.Decisions);
-        Assert.Equal("DEC-001", agent.Session.Decisions[0].Id);
-        Assert.Equal("Merge pain-point island into athlete persona", agent.Session.Decisions[0].Description);
+        Assert.Single(agent.Decisions);
+        Assert.Equal("DEC-001", agent.Decisions[0].Id);
+        Assert.Equal("Merge pain-point island into athlete persona", agent.Decisions[0].Description);
     }
 
     // --- Step 4: Distill → maps deliverables + island status ---
@@ -111,7 +111,7 @@ public class SessionMappingTests
     public async Task Step4_DistillResult_MapsDeliverablesAndIslandStatus()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
@@ -123,9 +123,9 @@ public class SessionMappingTests
         Assert.Equal(IslandStatus.Distilled, agent.Session!.Islands[0].Status);
         Assert.Equal(IslandStatus.Distilled, agent.Session.Islands[1].Status);
 
-        Assert.Single(agent.Session.Deliverables);
-        Assert.Equal("DEL-001", agent.Session.Deliverables[0].DeliverableId);
-        Assert.Equal(DeliverableStatus.Complete, agent.Session.Deliverables[0].Status);
+        Assert.Single(agent.Deliverables);
+        Assert.Equal("DEL-001", agent.Deliverables[0].DeliverableId);
+        Assert.Equal(DeliverableStatus.Complete, agent.Deliverables[0].Status);
     }
 
     // --- Step 5: Express → maps token consumption ---
@@ -134,16 +134,16 @@ public class SessionMappingTests
     public async Task Step5_ExpressResult_MapsTokenConsumption()
     {
         var agent = CreateAgent();
-        agent.StartSession("objective");
+        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteAllStepsAsync(builder, client);
 
         Assert.True(agent.IsCompleted);
-        Assert.Equal(2000, agent.Session!.Checkpoint.TokensConsumption.InputTokens);
-        Assert.Equal(5000, agent.Session.Checkpoint.TokensConsumption.OutputTokens);
-        Assert.Equal(7000, agent.Session.Checkpoint.TokensConsumption.TotalTokens);
+        Assert.Equal(2000, agent.Session!.CurrentCheckpoint!.TokensConsumption.InputTokens);
+        Assert.Equal(5000, agent.Session.CurrentCheckpoint.TokensConsumption.OutputTokens);
+        Assert.Equal(7000, agent.Session.CurrentCheckpoint.TokensConsumption.TotalTokens);
     }
 
     // --- Full pipeline ---
@@ -152,7 +152,7 @@ public class SessionMappingTests
     public async Task FullPipeline_EmptySession_MapsAllSteps()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-project", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
@@ -161,23 +161,18 @@ public class SessionMappingTests
         Assert.Equal(5, results.Count);
         Assert.True(agent.IsCompleted);
 
-        // Objective updated by step 1
-        Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.Checkpoint.SessionObjective);
-        // Islands from step 2
+        Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
         Assert.Equal(3, agent.Session.Islands.Count);
-        // Decisions from step 3
-        Assert.Single(agent.Session.Decisions);
-        // Deliverables from step 4
-        Assert.Single(agent.Session.Deliverables);
-        // Tokens from step 5
-        Assert.Equal(7000, agent.Session.Checkpoint.TokensConsumption.TotalTokens);
+        Assert.Single(agent.Decisions);
+        Assert.Single(agent.Deliverables);
+        Assert.Equal(7000, agent.Session.CurrentCheckpoint.TokensConsumption.TotalTokens);
     }
 
     [Fact]
     public async Task NoSession_DoesNotThrow_WhenApplySkipped()
     {
         var agent = CreateAgent();
-        // No StartSession call
+        // No OpenSession call
         var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
@@ -187,10 +182,20 @@ public class SessionMappingTests
         Assert.Null(agent.Session);
     }
 
-    // --- Fake chat client that returns typed results per step ---
+    // --- Fake chat client ---
 
     private class PhaseAwareChatClient : IChatClient
     {
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            var json = jsonSchema.Contains("triaged")
+                ? """{"triaged":[]}"""
+                : """{"sessionObjective":"Build personas for a college athletic recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
+
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
             StepResult result = step.StepNumber switch

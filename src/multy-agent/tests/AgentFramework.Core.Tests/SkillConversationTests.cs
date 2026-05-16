@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
@@ -11,6 +12,7 @@ namespace AgentFramework.Core.Tests;
 public class SkillConversationTests
 {
     private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
     private static UxPersona CreateAgent()
     {
@@ -65,24 +67,24 @@ public class SkillConversationTests
     [Fact]
     public async Task Step1_MessageContainsJsonSchema()
     {
+        // Chain uses handler-level calls; schema is internal. Assistant message has synthesis JSON output.
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("sessionObjective", userMsg.Content);
-        Assert.Contains("gateSatisfied", userMsg.Content);
-        Assert.Contains("Required Response Format", userMsg.Content);
+        var assistantMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.Assistant);
+        Assert.Contains("sessionObjective", assistantMsg.Content);
+        Assert.Contains("gateSatisfied", assistantMsg.Content);
     }
 
     [Fact]
     public async Task Step2_MessageContainsIslandsSchema()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -100,7 +102,7 @@ public class SkillConversationTests
     public async Task Step3_MessageContainsOrganizeSchema()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -120,24 +122,24 @@ public class SkillConversationTests
     [Fact]
     public async Task Step1_MessageContainsSkillInstructions()
     {
+        // Chain adds a minimal step-tracking user message; skill instructions are in internal handler calls
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
         var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("Skill: rehydrate-context", userMsg.Content);
-        Assert.Contains("session checkpoint", userMsg.Content);
-        Assert.Contains("Synthesize Session Objective", userMsg.Content);
+        Assert.Contains("Step 1", userMsg.Content);
+        Assert.Contains("Define objective for agent", userMsg.Content);
     }
 
     [Fact]
     public async Task Step2_MessageContainsCaptureSkill()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
 
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
@@ -158,7 +160,7 @@ public class SkillConversationTests
     public async Task Step2_MessageContainsObjectiveFromStep1()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -175,7 +177,7 @@ public class SkillConversationTests
     public async Task Step3_MessageContainsIslandsFromStep2()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -196,7 +198,7 @@ public class SkillConversationTests
     public async Task SystemPrompt_ContainsJsonInstruction()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -212,7 +214,7 @@ public class SkillConversationTests
     public async Task FullPipeline_WithSkills_MapsAllStepsToSession()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -220,17 +222,27 @@ public class SkillConversationTests
 
         Assert.Equal(5, results.Count);
         Assert.True(agent.IsCompleted);
-        Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
         Assert.Equal(3, agent.Session.Islands.Count);
-        Assert.Single(agent.Session.Decisions);
-        Assert.Single(agent.Session.Deliverables);
-        Assert.Equal(7000, agent.Session.Checkpoint.TokensConsumption.TotalTokens);
+        Assert.Single(agent.Decisions);
+        Assert.Single(agent.Deliverables);
+        Assert.Equal(7000, agent.Session.CurrentCheckpoint!.TokensConsumption.TotalTokens);
     }
 
     // --- Fakes ---
 
     private class FakeChatClient : IChatClient
     {
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            var json = jsonSchema.Contains("triaged")
+                ? """{"triaged":[]}"""
+                : """{"sessionObjective":"Build personas for college athletic recruiting platform","narrativeBridge":"Initial session — no prior context.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
+
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
             StepResult result = step.StepNumber switch

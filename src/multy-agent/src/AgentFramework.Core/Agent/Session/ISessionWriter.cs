@@ -2,22 +2,20 @@ using AgentFramework.Core.Agent.Steps.CODESteps;
 
 namespace AgentFramework.Core.Agent.Session;
 
-public interface ISessionWriter
+public interface ISessionWriter : IQuestionWriter
 {
     // Rehydrate phase
     void UpdateObjective(string sessionObjective);
 
-    // Capture phase — batch
+    // Capture phase
     void SetCapturedIslands(IReadOnlyList<CapturedIsland> islands);
 
-    // Organize phase — batch
+    // Organize phase
     void ApplyOrganization(IReadOnlyList<IslandOrganization> organizations, IReadOnlyList<DecisionRecord> decisions);
 
-    // Distill phase — batch
+    // Distill phase
     void ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables);
 
     // Express phase
     void UpdateTokenConsumption(int inputTokens, int outputTokens);
-    void RaiseQuestion(string id, string text, string source);
-    void ReviewQuestion(string id, QuestionStatus newStatus);
 }

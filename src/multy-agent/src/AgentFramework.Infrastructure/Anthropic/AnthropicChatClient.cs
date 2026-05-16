@@ -43,8 +43,27 @@ public sealed class AnthropicChatClient : IChatClient, IDisposable
         _http.DefaultRequestHeaders.TryAddWithoutValidation("anthropic-version", _options.ApiVersion);
     }
 
+    public async Task<TResult> SendHandlerAsync<TResult>(
+        IReadOnlyList<ChatMessage> messages,
+        string jsonSchema,
+        Func<JsonElement, TResult> parse,
+        CancellationToken ct = default)
+    {
+        var rawText = await CallApiAsync(messages, ct);
+        var jsonBlock = ExtractJsonBlock(rawText);
+        using var doc = JsonDocument.Parse(jsonBlock);
+        return parse(doc.RootElement);
+    }
+
     public async Task<StepResult> SendAsync(
         IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
+    {
+        var rawText = await CallApiAsync(messages, ct);
+        var jsonBlock = ExtractJsonBlock(rawText);
+        return StepResultParser.Parse(jsonBlock, rawText, step);
+    }
+
+    private async Task<string> CallApiAsync(IReadOnlyList<ChatMessage> messages, CancellationToken ct)
     {
         var (systemPrompt, apiMessages) = MapMessages(messages);
 
@@ -69,10 +88,7 @@ public sealed class AnthropicChatClient : IChatClient, IDisposable
         var apiResponse = JsonSerializer.Deserialize<AnthropicResponse>(body, SerializeOptions)
             ?? throw new InvalidOperationException("Failed to deserialize Anthropic response.");
 
-        var rawText = ExtractText(apiResponse);
-        var jsonBlock = ExtractJsonBlock(rawText);
-
-        return StepResultParser.Parse(jsonBlock, rawText, step);
+        return ExtractText(apiResponse);
     }
 
     private static (string? system, List<ApiMessage> messages) MapMessages(

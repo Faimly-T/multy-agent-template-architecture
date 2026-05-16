@@ -1,14 +1,13 @@
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
-using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
 
 namespace AgentFramework.Domain.UxAgent;
 
 public class UxStepMessageBuilder : IStepMessageBuilder
 {
-    public IReadOnlyList<ChatMessage> BuildMessages(AgentStep step, Role role, AgentSession? session, IReadOnlyList<ChatMessage> conversationHistory)
+    public IReadOnlyList<ChatMessage> BuildMessages(AgentStep step, Role role, IAgentRunContext? context, IReadOnlyList<ChatMessage> conversationHistory)
     {
         var messages = new List<ChatMessage>();
 
@@ -17,7 +16,7 @@ public class UxStepMessageBuilder : IStepMessageBuilder
             messages.Add(new ChatMessage(MessageRole.System, BuildSystemPrompt(role)));
         }
 
-        messages.Add(new ChatMessage(MessageRole.User, BuildUserPrompt(step, session)));
+        messages.Add(new ChatMessage(MessageRole.User, BuildUserPrompt(step, context)));
 
         return messages;
     }
@@ -40,16 +39,16 @@ public class UxStepMessageBuilder : IStepMessageBuilder
             """;
     }
 
-    private static string BuildUserPrompt(AgentStep step, AgentSession? session)
+    private static string BuildUserPrompt(AgentStep step, IAgentRunContext? context)
     {
-        var context = step.BuildContext(session);
+        var stepContext = step.BuildContext(context);
         var skillBlock = BuildSkillBlock(step);
         var jsonBlock = BuildJsonBlock(step);
 
         return $"""
             ## Step {step.StepNumber}: {step.Name}
 
-            {context}
+            {stepContext}
 
             {skillBlock}
 

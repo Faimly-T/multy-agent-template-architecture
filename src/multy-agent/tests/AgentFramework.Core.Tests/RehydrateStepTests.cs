@@ -1,11 +1,11 @@
 using System.Text.Json;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
+using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
@@ -13,6 +13,7 @@ namespace AgentFramework.Core.Tests;
 public class RehydrateStepTests
 {
     private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
     private static RehydrateStep CreateStep() =>
         new(1, "Define objective for agent", "Session Objective. Parse product description.", new Gate("Objective confirmed"));
@@ -67,194 +68,6 @@ public class RehydrateStepTests
     {
         var step = CreateStep();
         Assert.Contains("isInitialSession", step.JsonResponseSchema);
-    }
-
-    // ==========================================================
-    // BuildContext — null session
-    // ==========================================================
-
-    [Fact]
-    public void BuildContext_NullSession_ReturnsInitialSession()
-    {
-        var step = CreateStep();
-
-        var context = step.BuildContext(null);
-
-        Assert.Contains("Initial Session", context);
-        Assert.Contains("session #1", context);
-    }
-
-    // ==========================================================
-    // BuildContext — initial session (iteration 1)
-    // ==========================================================
-
-    [Fact]
-    public void BuildContext_InitialSession_ContainsObjective()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas for recruiting platform");
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Initial Session", context);
-        Assert.Contains("Build personas for recruiting platform", context);
-        Assert.Contains("verb + deliverable + success condition + stakes", context);
-    }
-
-    [Fact]
-    public void BuildContext_InitialSession_NoStalenessWarning()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-
-        var context = step.BuildContext(session);
-
-        Assert.DoesNotContain("Staleness warning", context);
-    }
-
-    [Fact]
-    public void BuildContext_InitialSession_NoOpenQuestions_OmitsQuestionsBlock()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-
-        var context = step.BuildContext(session);
-
-        Assert.DoesNotContain("Open questions", context);
-        Assert.DoesNotContain("Answered questions", context);
-    }
-
-    // ==========================================================
-    // BuildContext — continuation session (iteration > 1)
-    // ==========================================================
-
-    [Fact]
-    public void BuildContext_ContinuationSession_ContainsIteration()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Refine personas", sessionIteration: 2);
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Session iteration: 2", context);
-        Assert.Contains("Refine personas", context);
-        Assert.DoesNotContain("Initial Session", context);
-    }
-
-    [Fact]
-    public void BuildContext_ContinuationSession_ContainsCheckpointDate()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Refine personas", sessionIteration: 2);
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Prior checkpoint date:", context);
-        Assert.Contains(DateTime.UtcNow.ToString("yyyy-MM-dd"), context);
-    }
-
-    // ==========================================================
-    // BuildContext — answered questions
-    // ==========================================================
-
-    [Fact]
-    public void BuildContext_WithAnsweredQuestions_IncludesAnswerBlock()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-        session.RaiseQuestion("UX-Q001", "What sport?", "express");
-        session.FindQuestion("UX-Q001")!.SetAnswer("Football", "PjM Interview");
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Answered questions from prior session", context);
-        Assert.Contains("UX-Q001", context);
-        Assert.Contains("Football", context);
-        Assert.Contains("PjM Interview", context);
-    }
-
-    [Fact]
-    public void BuildContext_WithAnsweredQuestions_InstructsExpressReview()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-        session.RaiseQuestion("UX-Q001", "What sport?", "express");
-        session.FindQuestion("UX-Q001")!.SetAnswer("Football", "PjM");
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Express step", context);
-        Assert.Contains("reviewed list", context);
-    }
-
-    // ==========================================================
-    // BuildContext — open questions
-    // ==========================================================
-
-    [Fact]
-    public void BuildContext_WithOpenQuestions_IncludesTriageBlock()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-        session.RaiseQuestion("UX-Q002", "What's the target market?", "express");
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Open questions from prior session", context);
-        Assert.Contains("triage each", context);
-        Assert.Contains("UX-Q002", context);
-        Assert.Contains("What's the target market?", context);
-    }
-
-    [Fact]
-    public void BuildContext_MixedQuestionStatuses_ShowsBothBlocks()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-        session.RaiseQuestion("UX-Q001", "What sport?", "express");
-        session.FindQuestion("UX-Q001")!.SetAnswer("Football", "PjM");
-        session.RaiseQuestion("UX-Q002", "What market?", "express");
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Answered questions from prior session", context);
-        Assert.Contains("Open questions from prior session", context);
-        Assert.Contains("UX-Q001", context);
-        Assert.Contains("UX-Q002", context);
-    }
-
-    // ==========================================================
-    // BuildContext — prior work summary
-    // ==========================================================
-
-    [Fact]
-    public void BuildContext_WithPriorWork_IncludesSummary()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Refine personas", sessionIteration: 2);
-        session.Backlog.SetCaptured([
-            new CapturedIsland("ISL-001", IslandType.UserType, "Student athlete", "input")
-        ]);
-        session.RecordDecision("DEC-001", "Merge clusters", "Cleaner model");
-        session.RecordDeliverable("DEL-001", "outputs/personas/01.md", DeliverableStatus.Complete);
-
-        var context = step.BuildContext(session);
-
-        Assert.Contains("Prior work summary", context);
-        Assert.Contains("Islands: 1 total", context);
-        Assert.Contains("Decisions: 1", context);
-        Assert.Contains("Deliverables: 1", context);
-    }
-
-    [Fact]
-    public void BuildContext_NoPriorWork_OmitsSummary()
-    {
-        var step = CreateStep();
-        var session = new AgentSession("Build personas");
-
-        var context = step.BuildContext(session);
-
-        Assert.DoesNotContain("Prior work summary", context);
     }
 
     // ==========================================================
@@ -349,7 +162,7 @@ public class RehydrateStepTests
     public void ApplyTo_UpdatesSessionObjective()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var result = new RehydrateResult(
             Output: "json output",
             GateSatisfied: true,
@@ -357,27 +170,27 @@ public class RehydrateStepTests
             NarrativeBridge: "First session — starting fresh.",
             IsInitialSession: true);
 
-        result.ApplyTo(agent.Session!);
+        result.ApplyTo(agent);
 
-        Assert.Equal("Build 3 validated persona cards for athletic recruiting", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Equal("Build 3 validated persona cards for athletic recruiting", agent.Session!.CurrentCheckpoint!.SessionObjective);
     }
 
     [Fact]
     public void ApplyTo_PreservesExistingSessionState()
     {
         var agent = CreateAgent();
-        var session = agent.StartSession("initial", sessionIteration: 2);
-        session.Backlog.SetCaptured([
+        agent.OpenSession("test-proj", TestMarkFilePaths, "initial");
+        agent.Session!.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "input")
         ]);
-        session.RaiseQuestion("UX-Q001", "What sport?", "express");
+        agent.RaiseQuestion("UX-Q001", "What sport?", "express");
 
         var result = new RehydrateResult("json", true, "Refined objective");
-        result.ApplyTo(agent.Session!);
+        result.ApplyTo(agent);
 
-        Assert.Equal("Refined objective", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Equal("Refined objective", agent.Session!.CurrentCheckpoint!.SessionObjective);
         Assert.Single(agent.Session.Backlog.All);
-        Assert.Single(agent.Session.Questions);
+        Assert.Single(agent.Questions);
     }
 
     // ==========================================================
@@ -401,7 +214,7 @@ public class RehydrateStepTests
     public async Task UxPersona_Step1_WithRealSkill_ProducesRehydrateResult()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
@@ -418,58 +231,54 @@ public class RehydrateStepTests
     [Fact]
     public async Task UxPersona_Step1_MessageContainsSkillInstructions()
     {
+        // Chain adds a minimal step-tracking user message; skill instructions are in internal handler calls
         var agent = CreateAgentWithSkills();
-        agent.StartSession("Analyze athletic recruiting platform");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "Analyze athletic recruiting platform");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
         var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("Skill: rehydrate-context", userMsg.Content);
-        Assert.Contains("session checkpoint", userMsg.Content);
-        Assert.Contains("Synthesize Session Objective", userMsg.Content);
-        Assert.Contains("verb + deliverable + success condition + stakes", userMsg.Content);
+        Assert.Contains("Step 1", userMsg.Content);
+        Assert.Contains("Define objective for agent", userMsg.Content);
     }
 
     [Fact]
     public async Task UxPersona_Step1_MessageContainsJsonSchema()
     {
+        // JSON schema is in internal ObjectiveSynthesisHandler calls; assistant message has synthesis result
         var agent = CreateAgentWithSkills();
-        agent.StartSession("Analyze athletic recruiting platform");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "Analyze athletic recruiting platform");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("sessionObjective", userMsg.Content);
-        Assert.Contains("narrativeBridge", userMsg.Content);
-        Assert.Contains("blockers", userMsg.Content);
-        Assert.Contains("stalenessWarning", userMsg.Content);
-        Assert.Contains("Required Response Format", userMsg.Content);
+        var assistantMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.Assistant);
+        Assert.Contains("sessionObjective", assistantMsg.Content);
     }
 
     [Fact]
     public async Task UxPersona_Step1_MessageContainsInitialSessionContext()
     {
+        // Session context is synthesized by chain handlers; conversation has step tracking only
         var agent = CreateAgentWithSkills();
-        agent.StartSession("Build personas for athletic recruiting");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "Build personas for athletic recruiting");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
         var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("Initial Session", userMsg.Content);
-        Assert.Contains("Build personas for athletic recruiting", userMsg.Content);
+        Assert.Contains("Step 1", userMsg.Content);
     }
 
     [Fact]
     public async Task UxPersona_Step1_SessionUpdatedAfterExecution()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
@@ -478,7 +287,7 @@ public class RehydrateStepTests
         Assert.NotNull(agent.Session);
         Assert.Equal(
             "Build validated persona cards for college athletic recruiting platform. Success = 3+ distinct personas with JTBD. Stakes: journey mapping and UX design blocked without foundational personas.",
-            agent.Session.Checkpoint.SessionObjective);
+            agent.Session.CurrentCheckpoint!.SessionObjective);
         Assert.Equal(1, agent.Pipeline.CurrentStepIndex);
     }
 
@@ -486,7 +295,7 @@ public class RehydrateStepTests
     public async Task UxPersona_Step1_ConversationHasSystemUserAssistant()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
@@ -502,7 +311,7 @@ public class RehydrateStepTests
     public async Task UxPersona_Step1_SystemPromptContainsRoleIdentity()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
@@ -518,22 +327,25 @@ public class RehydrateStepTests
     public async Task UxPersona_Step1_RaisesStepEvents()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        Assert.Equal(2, agent.DomainEvents.Count);
-        Assert.IsType<AgentFramework.Core.Agent.Events.StepStarted>(agent.DomainEvents[0]);
-        Assert.IsType<AgentFramework.Core.Agent.Events.StepCompleted>(agent.DomainEvents[1]);
+        Assert.Equal(6, agent.DomainEvents.Count); // StepStarted + 4×HandlerExchanged + StepCompleted
+        Assert.IsType<StepStarted>(agent.DomainEvents[0]);
+        Assert.Equal(4, agent.DomainEvents.OfType<HandlerExchanged>().Count());
+        Assert.IsType<StepCompleted>(agent.DomainEvents[5]);
     }
 
     [Fact]
     public async Task UxPersona_Step1_WithBlockers_ParsesBlockerList()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
+        agent.RaiseQuestion("UX-Q003", "No access to user research data", "express");
+        agent.RaiseQuestion("UX-Q004", "Anti-persona priority unclear", "express");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateFakeChatClientWithBlockers();
 
@@ -549,7 +361,7 @@ public class RehydrateStepTests
     public async Task UxPersona_Step1_GateFailed_DoesNotAdvanceStep()
     {
         var agent = CreateAgentWithSkills();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new RehydrateGateFailChatClient();
 
@@ -571,10 +383,19 @@ public class RehydrateStepTests
               "narrativeBridge": "Initial session — no prior context exists. Starting from the product description to identify user types, goals, and pain points.",
               "isInitialSession": true,
               "stalenessWarning": null,
-              "blockers": [],
               "gateSatisfied": true
             }
             """;
+
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            var json = jsonSchema.Contains("triaged")
+                ? """{"triaged":[]}"""
+                : RehydrateJson;
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
 
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
@@ -586,12 +407,12 @@ public class RehydrateStepTests
 
     private class RehydrateFakeChatClientWithBlockers : IChatClient
     {
-        private const string RehydrateJson = """
+        private const string SynthesisJson = """
             {
               "sessionObjective": "Refine persona cards for recruiting platform. Success = address all blockers. Stakes: personas remain incomplete.",
-              "narrativeBridge": "Continuing from session 1 — 3 draft personas were created but blockers remain.",
-              "isInitialSession": false,
-              "stalenessWarning": "Last checkpoint was 5 days ago — priorities may have shifted.",
+              "narrativeBridge": "Continuing — blockers remain unresolved.",
+              "isInitialSession": true,
+              "stalenessWarning": null,
               "blockers": [
                 { "questionId": "UX-Q003", "text": "No access to user research data", "severity": "hard" },
                 { "questionId": "UX-Q004", "text": "Anti-persona priority unclear", "severity": "soft" }
@@ -600,27 +421,52 @@ public class RehydrateStepTests
             }
             """;
 
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[{"id":"UX-Q003","status":"still_open","answer":null,"blockerSeverity":"hard"},{"id":"UX-Q004","status":"still_open","answer":null,"blockerSeverity":"soft"}]}""";
+            else
+                json = SynthesisJson;
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
+
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
-            var doc = JsonDocument.Parse(RehydrateJson);
-            var result = step.ParseResult(doc.RootElement, RehydrateJson, true);
+            var doc = JsonDocument.Parse(SynthesisJson);
+            var result = step.ParseResult(doc.RootElement, SynthesisJson, true);
             return Task.FromResult(result);
         }
     }
 
     private class RehydrateGateFailChatClient : IChatClient
     {
-        private const string RehydrateJson = """
+        private const string FailJson = """
             {
               "sessionObjective": "",
+              "narrativeBridge": "",
+              "isInitialSession": true,
+              "stalenessWarning": null,
               "gateSatisfied": false
             }
             """;
 
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            var json = jsonSchema.Contains("triaged")
+                ? """{"triaged":[]}"""
+                : FailJson;
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
+
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
-            var doc = JsonDocument.Parse(RehydrateJson);
-            var result = step.ParseResult(doc.RootElement, RehydrateJson, false);
+            var doc = JsonDocument.Parse(FailJson);
+            var result = step.ParseResult(doc.RootElement, FailJson, false);
             return Task.FromResult(result);
         }
     }

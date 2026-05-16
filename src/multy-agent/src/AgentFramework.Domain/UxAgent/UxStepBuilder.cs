@@ -44,7 +44,7 @@ public class UxStepBuilder
         foreach (var step in _steps)
         {
             if (!string.IsNullOrEmpty(step.SkillName) && skillMap.TryGetValue(step.SkillName, out var skill))
-                step.AttachSkill(skill);
+                step.AttachSkill(skill); 
         }
     }
 

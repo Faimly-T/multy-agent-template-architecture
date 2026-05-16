@@ -1,13 +1,22 @@
 using System.Text.Json;
+using AgentFramework.Core.Agent.Events;
+using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
+using AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate;
+using AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
 
 public class RehydrateStep : AgentStep
 {
+    private readonly IMarkFileReader _markFileReader;
 
-    public RehydrateStep(int stepNumber, string name, string instructions, Gate gate)
-        : base(stepNumber, name, "rehydrate-context", instructions, gate) { }
+    public RehydrateStep(int stepNumber, string name, string instructions, Gate gate,
+        IMarkFileReader? markFileReader = null)
+        : base(stepNumber, name, "rehydrate-context", instructions, gate)
+    {
+        _markFileReader = markFileReader ?? new NullMarkFileReader();
+    }
 
     public override string JsonResponseSchema => """
         {
@@ -22,91 +31,34 @@ public class RehydrateStep : AgentStep
         }
         """;
 
-    public override string BuildContext(AgentSession? session)
+    public List<HandlerExchange> Journal { get; } = [];
+
+    public override async Task<StepResult?> ExecuteChainAsync(
+        IAgentRunContext? context,
+        ISessionWriter writer,
+        IChatClient chatClient,
+        IDomainEventPublisher? publisher = null,
+        Role? role = null,
+        CancellationToken ct = default)
     {
-        if (session is null)
-            return "Initial Session — no prior context exists. This is session #1.";
+        var chain = new RehydrateContextChain(
+            new MarkFileLoaderHandler(_markFileReader),
+            new IterationEvaluatorHandler(),
+            new QuestionTriageHandler(_markFileReader),
+            new ObjectiveSynthesisHandler(role, Skill));
 
-        var isInitial = session.Checkpoint.SessionIteration <= 1;
+        var (finalJson, journal) = await chain.RunAsync(context, writer, chatClient, ct);
 
-        // --- Header: session type ---
-        string context;
-        if (isInitial)
-        {
-            context = $"""
-                Initial Session — session #1. No prior session state.
-                User input objective: {session.Checkpoint.SessionObjective}
+        Journal.Clear();
+        Journal.AddRange(journal);
 
-                Synthesize a Session Objective containing: verb + deliverable + success condition + stakes clause.
-                """;
-        }
-        else
-        {
-            context = $"""
-                Session iteration: {session.Checkpoint.SessionIteration}
-                Prior checkpoint date: {session.Checkpoint.Date:yyyy-MM-dd}
-                Prior session objective: {session.Checkpoint.SessionObjective}
-                """;
+        if (publisher is not null)
+            foreach (var exchange in journal)
+                publisher.Publish(new HandlerExchanged(StepNumber, Name, exchange));
 
-            // Staleness check
-            var daysSinceCheckpoint = (DateTime.UtcNow - session.Checkpoint.Date).Days;
-            if (daysSinceCheckpoint > 3)
-            {
-                context += $"\n\n⚠️ Staleness warning: Last checkpoint was {daysSinceCheckpoint} days ago — priorities may have shifted.";
-            }
-        }
-
-        // --- Answered questions (always included, carry through all steps) ---
-        var answeredQuestions = session.Questions
-            .Where(q => q.Status == QuestionStatus.Answered)
-            .ToList();
-
-        if (answeredQuestions.Count > 0)
-        {
-            var lines = answeredQuestions.Select(q =>
-                $"- {q.Id}: {q.Text} → Answer: {q.Answer} (Source: {q.AnswerSource})");
-
-            context += $"""
-
-
-                Answered questions from prior session (use these throughout all steps):
-                {string.Join("\n", lines)}
-
-                In the Express step, return a reviewed list confirming which answers you've incorporated.
-                """;
-        }
-
-        // --- Open questions (triage each) ---
-        var openQuestions = session.Questions
-            .Where(q => q.Status == QuestionStatus.Open)
-            .ToList();
-
-        if (openQuestions.Count > 0)
-        {
-            var lines = openQuestions.Select(q => $"- {q.Id}: {q.Text}");
-
-            context += $"""
-
-
-                Open questions from prior session (triage each — resolve, obsolete, or flag as blocker):
-                {string.Join("\n", lines)}
-                """;
-        }
-
-        // --- Prior work summary ---
-        if (session.Backlog.Count > 0 || session.Decisions.Count > 0 || session.Deliverables.Count > 0)
-        {
-            context += $"""
-
-
-                Prior work summary:
-                Islands: {session.Backlog.Count} total ({session.Backlog.GetByStatus(IslandStatus.Distilled).Count} distilled)
-                Decisions: {session.Decisions.Count}
-                Deliverables: {session.Deliverables.Count}
-                """;
-        }
-
-        return context;
+        using var doc = JsonDocument.Parse(finalJson);
+        var gateSatisfied = !doc.RootElement.TryGetProperty("gateSatisfied", out var gs) || gs.GetBoolean();
+        return ParseResult(doc.RootElement, finalJson, gateSatisfied);
     }
 
     public override StepResult ParseResult(JsonElement root, string rawOutput, bool gateSatisfied)
@@ -136,7 +88,15 @@ public class RehydrateStep : AgentStep
             }
         }
 
-        return new RehydrateResult(rawOutput, gateSatisfied, objective, narrativeBridge, stalenessWarning, isInitialSession, blockers);
+        return new RehydrateResult(rawOutput, gateSatisfied, objective, narrativeBridge,
+            stalenessWarning, isInitialSession, blockers);
+    }
+
+    private sealed class NullMarkFileReader : IMarkFileReader
+    {
+        public Task<string?> ReadProgressSummaryAsync(CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<string?> ReadQuestionsLogAsync(CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<string?> ReadDistillHistoryAsync(CancellationToken ct) => Task.FromResult<string?>(null);
     }
 }
 
@@ -151,8 +111,8 @@ public record RehydrateResult(
     bool IsInitialSession = false,
     IReadOnlyList<RehydrateBlocker>? Blockers = null) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        session.UpdateObjective(SessionObjective);
+        writer.UpdateObjective(SessionObjective);
     }
 }

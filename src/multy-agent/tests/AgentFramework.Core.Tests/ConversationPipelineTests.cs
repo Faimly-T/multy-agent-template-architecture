@@ -1,3 +1,4 @@
+using System.Text.Json;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Events;
@@ -12,6 +13,7 @@ namespace AgentFramework.Core.Tests;
 public class ConversationPipelineTests
 {
     private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
     private static UxPersona CreateAgent()
     {
@@ -25,7 +27,7 @@ public class ConversationPipelineTests
     public async Task Step1_BuildsSystemPromptWithRole_OnFirstInteraction()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -41,44 +43,43 @@ public class ConversationPipelineTests
     public async Task Step1_BuildsUserPromptWithStepInstructions()
     {
         var agent = CreateAgent();
-        agent.StartSession("Build personas for recruiting app");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "Build personas for recruiting app");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        // User message is second in conversation
+        // Chain adds a minimal step-tracking user message; session input goes into chain handler calls
         Assert.Equal(MessageRole.User, agent.ConversationMessages[1].Role);
         Assert.Contains("Define objective for agent", agent.ConversationMessages[1].Content);
-        Assert.Contains("Build personas for recruiting app", agent.ConversationMessages[1].Content);
     }
 
     [Fact]
     public async Task Step1_AssistantResponseIsRecorded()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        // Assistant response is third
+        // Assistant response is the chain's synthesis JSON output
         Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
-        Assert.Equal("Objective defined", agent.ConversationMessages[2].Content);
+        Assert.Contains("sessionObjective", agent.ConversationMessages[2].Content);
     }
 
     [Fact]
     public async Task Step1_MapsObjectiveToSession()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
     }
 
     // --- Step 2: Conversation accumulates ---
@@ -87,7 +88,7 @@ public class ConversationPipelineTests
     public async Task Step2_DoesNotDuplicateSystemPrompt()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -102,7 +103,7 @@ public class ConversationPipelineTests
     public async Task Step2_ConversationHasFullHistory()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -117,7 +118,7 @@ public class ConversationPipelineTests
     public async Task Step2_SendsFullHistoryToChatClient()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -132,7 +133,7 @@ public class ConversationPipelineTests
     public async Task Step2_UserPromptIncludesSessionObjective()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -150,15 +151,16 @@ public class ConversationPipelineTests
     public async Task ConversationPipeline_RaisesDomainEvents()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(builder, client);
 
-        Assert.Equal(2, agent.DomainEvents.Count);
+        Assert.Equal(6, agent.DomainEvents.Count); // StepStarted + 4×HandlerExchanged + StepCompleted
         Assert.IsType<StepStarted>(agent.DomainEvents[0]);
-        Assert.IsType<StepCompleted>(agent.DomainEvents[1]);
+        Assert.Equal(4, agent.DomainEvents.OfType<HandlerExchanged>().Count());
+        Assert.IsType<StepCompleted>(agent.DomainEvents[5]);
     }
 
     // --- Gate failure ---
@@ -167,7 +169,7 @@ public class ConversationPipelineTests
     public async Task ConversationPipeline_GateFailed_StillRecordsAssistantMessage()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient(failGate: true);
 
@@ -185,7 +187,7 @@ public class ConversationPipelineTests
     public async Task FullPipeline_AccumulatesConversation()
     {
         var agent = CreateAgent();
-        agent.StartSession("placeholder");
+        agent.OpenSession("test-proj", TestMarkFilePaths, "placeholder");
         var builder = new UxStepMessageBuilder();
         var client = new FakeChatClient();
 
@@ -207,6 +209,17 @@ public class ConversationPipelineTests
         public FakeChatClient(bool failGate = false)
         {
             _failGate = failGate;
+        }
+
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            var passed = !_failGate;
+            var json = jsonSchema.Contains("triaged")
+                ? """{"triaged":[]}"""
+                : $$"""{"sessionObjective":"Build personas for college athletic recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":{{(passed ? "true" : "false")}}}""";
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
         }
 
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)

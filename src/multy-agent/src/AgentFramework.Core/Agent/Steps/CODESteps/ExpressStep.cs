@@ -20,25 +20,28 @@ public class ExpressStep : AgentStep
         }
         """;
 
-    public override string BuildContext(AgentSession? session)
+    public override string BuildContext(IAgentRunContext? context)
     {
-        if (session is null) return "No session context";
+        if (context is null) return "No session context";
 
-        var deliverables = session.Deliverables
+        var deliverables = context.Deliverables
             .Select(d => $"- {d.DeliverableId}: {d.Path} ({d.Status})");
 
-        var islandStats = $"Islands: {session.Backlog.Count} total, " +
-            $"{session.Backlog.GetByStatus(IslandStatus.Distilled).Count} distilled, " +
-            $"{session.Backlog.GetByStatus(IslandStatus.Discarded).Count} discarded";
+        var backlog = context.Session?.Backlog;
+        var islandStats = backlog is not null
+            ? $"Islands: {backlog.Count} total, " +
+              $"{backlog.GetByStatus(IslandStatus.Distilled).Count} distilled, " +
+              $"{backlog.GetByStatus(IslandStatus.Discarded).Count} discarded"
+            : "Islands: none";
 
-        var questionsBlock = BuildQuestionsBlock(session);
+        var questionsBlock = BuildQuestionsBlock(context.Questions);
 
         return $"""
             Deliverables produced:
             {(deliverables.Any() ? string.Join("\n", deliverables) : "None")}
 
             {islandStats}
-            Decisions made: {session.Decisions.Count}
+            Decisions made: {context.Decisions.Count}
 
             {questionsBlock}
 
@@ -69,9 +72,8 @@ public class ExpressStep : AgentStep
         return new ExpressResult(rawOutput, gateSatisfied, input, outputTokens, questions);
     }
 
-    private static string BuildQuestionsBlock(AgentSession session)
+    private static string BuildQuestionsBlock(IReadOnlyList<Question> questions)
     {
-        var questions = session.Questions;
         if (questions.Count == 0) return "No questions logged.";
 
         var lines = questions.Select(q =>
@@ -96,9 +98,9 @@ public record ExpressResult(
     int OutputTokens,
     IReadOnlyList<QuestionRecord> Questions) : StepResult(Output, GateSatisfied)
 {
-    public override void ApplyTo(AgentSession session)
+    public override void ApplyTo(ISessionWriter writer)
     {
-        session.UpdateTokenConsumption(InputTokens, OutputTokens);
+        writer.UpdateTokenConsumption(InputTokens, OutputTokens);
 
         foreach (var q in Questions)
         {
@@ -107,13 +109,9 @@ public record ExpressResult(
                 : QuestionStatus.Open;
 
             if (status == QuestionStatus.Open)
-            {
-                session.RaiseQuestion(q.Id, q.Text, "express-relay");
-            }
+                writer.RaiseQuestion(q.Id, q.Text, "express-relay");
             else
-            {
-                session.ApplyQuestionReview(q.Id, status);
-            }
+                writer.ReviewQuestion(q.Id, status);
         }
     }
 

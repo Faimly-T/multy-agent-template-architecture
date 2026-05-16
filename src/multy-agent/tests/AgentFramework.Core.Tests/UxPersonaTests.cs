@@ -82,9 +82,8 @@ public class UxPersonaTests
         var markdown = File.ReadAllText(TestRoleDataPath);
         var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
 
-        agent.StartSession(
-            "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.",
-            sessionIteration: 1);
+        agent.OpenSession("test-proj", new SessionMarkFilePaths("UX", "outputs/contextAgent"),
+            "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.");
 
         var messageBuilder = new UxStepMessageBuilder();
 
@@ -101,7 +100,7 @@ public class UxPersonaTests
 
         // Session should be updated
         Assert.NotNull(agent.Session);
-        Assert.Contains(agent.Session.Checkpoint.SessionObjective, rehydrate.SessionObjective);
+        Assert.Contains(agent.Session.CurrentCheckpoint!.SessionObjective, rehydrate.SessionObjective);
 
         // Conversation should have system + user + assistant messages
         Assert.True(agent.ConversationMessages.Count >= 3);
@@ -133,6 +132,8 @@ public class UxPersonaTests
         var pipelineFactory = new TestPipelineFactory();
         var deliverableWriter = new TestDeliverableWriter();
 
+        agent.OpenSession("test-proj", new SessionMarkFilePaths("UX", "outputs/contextAgent"));
+
         // Act — execute full process via RunAsync
         var runResult = await agent.RunAsync(
             "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.",
@@ -155,10 +156,10 @@ public class UxPersonaTests
 
         Assert.All(runResult.StepResults, result => Assert.True(result.GateSatisfied));
 
-        Assert.NotEmpty(runResult.Session.Deliverables);
-        Assert.True(runResult.Session.Checkpoint.SessionObjective.Contains("recruiting platform", StringComparison.OrdinalIgnoreCase));
-        Assert.True(runResult.Session.Checkpoint.TokensConsumption.InputTokens >= 0);
-        Assert.True(runResult.Session.Checkpoint.TokensConsumption.OutputTokens >= 0);
+        Assert.NotEmpty(runResult.Deliverables);
+        Assert.True(runResult.Session.CurrentCheckpoint!.SessionObjective.Contains("recruiting platform", StringComparison.OrdinalIgnoreCase));
+        Assert.True(runResult.Session.CurrentCheckpoint!.TokensConsumption.InputTokens >= 0);
+        Assert.True(runResult.Session.CurrentCheckpoint!.TokensConsumption.OutputTokens >= 0);
 
         // Verify deliverables were written
         Assert.True(deliverableWriter.WasWritten);
@@ -177,7 +178,7 @@ public class UxPersonaTests
     {
         public bool WasWritten { get; private set; }
 
-        public Task WriteAsync(AgentSession session, IReadOnlyList<StepResult> results, CancellationToken ct = default)
+        public Task WriteAsync(IAgentRunContext context, IReadOnlyList<StepResult> results, CancellationToken ct = default)
         {
             WasWritten = true;
             return Task.CompletedTask;

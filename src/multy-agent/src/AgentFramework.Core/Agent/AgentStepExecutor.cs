@@ -20,14 +20,29 @@ public class AgentStepExecutor
     public async Task<StepResult> ExecuteStepAsync(
         AgentStep step,
         Role role,
-        AgentSession? session,
+        IAgentRunContext? context,
+        ISessionWriter writer,
         IStepMessageBuilder messageBuilder,
         IChatClient chatClient,
         CancellationToken ct = default)
     {
         _eventPublisher.Publish(new StepStarted(step.StepNumber, step.Name, step.SkillName));
 
-        var messages = messageBuilder.BuildMessages(step, role, session, _conversation.Messages);
+        var chainResult = await step.ExecuteChainAsync(context, writer, chatClient, _eventPublisher, role, ct);
+
+        if (chainResult is not null)
+        {
+            var initMessages = messageBuilder.BuildMessages(step, role, context, _conversation.Messages);
+            foreach (var msg in initMessages.Where(m => m.Role == MessageRole.System))
+                _conversation.AddSystemMessage(msg.Content);
+
+            _conversation.AddUserMessage($"## Step {step.StepNumber}: {step.Name}");
+            _conversation.AddAssistantMessage(chainResult.Output);
+            ApplyStepOutcome(step, chainResult, writer, context);
+            return chainResult;
+        }
+
+        var messages = messageBuilder.BuildMessages(step, role, context, _conversation.Messages);
 
         foreach (var msg in messages)
         {
@@ -41,12 +56,12 @@ public class AgentStepExecutor
 
         _conversation.AddAssistantMessage(result.Output);
 
-        ApplyStepOutcome(step, result, session);
+        ApplyStepOutcome(step, result, writer, context);
 
         return result;
     }
 
-    private void ApplyStepOutcome(AgentStep step, StepResult result, AgentSession? session)
+    private void ApplyStepOutcome(AgentStep step, StepResult result, ISessionWriter writer, IAgentRunContext? context)
     {
         if (!result.GateSatisfied)
         {
@@ -54,12 +69,11 @@ public class AgentStepExecutor
             return;
         }
 
-        if (session is not null)
-            result.ApplyTo(session);
+        result.ApplyTo(writer);
 
-        if (session is not null && step.Gate.Verify is not null)
+        if (context?.Session is not null && step.Gate.Verify is not null)
         {
-            var verified = step.Gate.Verify(session, result);
+            var verified = step.Gate.Verify(context.Session, result);
             if (!verified)
             {
                 _eventPublisher.Publish(new StepGateFailed(step.StepNumber, step.Name, step.Gate.Description, result));
@@ -68,9 +82,7 @@ public class AgentStepExecutor
         }
 
         foreach (var domainEvent in result.GetDomainEvents())
-        {
             _eventPublisher.Publish(domainEvent);
-        }
 
         _eventPublisher.Publish(new StepCompleted(step.StepNumber, step.Name, result));
     }
