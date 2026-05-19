@@ -56,7 +56,7 @@ public class AgentAggregate<TId> :
     }
 
     // --- Session lifecycle ---
-
+    //TODO: this is the rehidrate method I need to merge.
     public AgentSession OpenSession(string projectId, SessionMarkFilePaths markFilePaths, string initialObjective = "")
     {
         Session = new AgentSession(projectId, markFilePaths);

@@ -2,6 +2,7 @@ using AgentFramework.Core.Agent.Steps.CODESteps;
 
 namespace AgentFramework.Core.Agent.Session;
 
+//TODO: I need to evaluate this interface and evaluate how to handle the historical information.
 public interface ISessionWriter : IQuestionWriter
 {
     // Rehydrate phase

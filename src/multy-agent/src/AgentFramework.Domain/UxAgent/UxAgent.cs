@@ -16,7 +16,6 @@ public class UxPersona : AgentAggregate<string>
         if (pSteps.Length == 0)
             throw new InvalidOperationException("At least one step is required. Call WithSteps() before Build().");
 
-
         Pipeline = UxStepBuilder.Create()
         // TODO: the steps should be dynamic and control by the pipeline framewrok CODE
         //First I need to build the pipeline strategy that I will use in this case CODE

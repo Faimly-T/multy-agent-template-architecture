@@ -26,39 +26,41 @@ public class AgentStepExecutor
         IChatClient chatClient,
         CancellationToken ct = default)
     {
-        _eventPublisher.Publish(new StepStarted(step.StepNumber, step.Name, step.SkillName));
+        //TODO: for now I will have this disable the logic of events.
+        //_eventPublisher.Publish(new StepStarted(step.StepNumber, step.Name, step.SkillName));
 
-        var chainResult = await step.ExecuteChainAsync(context, writer, chatClient, _eventPublisher, role, ct);
+        var chainResult = await step.ExecuteStepAsync(context, writer, chatClient, _eventPublisher, role, ct);
 
-        if (chainResult is not null)
-        {
-            var initMessages = messageBuilder.BuildMessages(step, role, context, _conversation.Messages);
-            foreach (var msg in initMessages.Where(m => m.Role == MessageRole.System))
-                _conversation.AddSystemMessage(msg.Content);
+        // if (chainResult is not null)
+        // {
+        //     var initMessages = messageBuilder.BuildMessages(step, role, context, _conversation.Messages);
+        //     foreach (var msg in initMessages.Where(m => m.Role == MessageRole.System))
+        //         _conversation.AddSystemMessage(msg.Content);
 
-            _conversation.AddUserMessage($"## Step {step.StepNumber}: {step.Name}");
-            _conversation.AddAssistantMessage(chainResult.Output);
-            ApplyStepOutcome(step, chainResult, writer, context);
-            return chainResult;
-        }
+        //     _conversation.AddUserMessage($"## Step {step.StepNumber}: {step.Name}");
+        //     _conversation.AddAssistantMessage(chainResult.Output);
+        //     ApplyStepOutcome(step, chainResult, writer, context);
+        //     return chainResult;
+        // }
 
-        var messages = messageBuilder.BuildMessages(step, role, context, _conversation.Messages);
+        // var messages = messageBuilder.BuildMessages(step, role, context, _conversation.Messages);
 
-        foreach (var msg in messages)
-        {
-            if (msg.Role == MessageRole.System)
-                _conversation.AddSystemMessage(msg.Content);
-            else
-                _conversation.AddUserMessage(msg.Content);
-        }
+        // foreach (var msg in messages)
+        // {
+        //     if (msg.Role == MessageRole.System)
+        //         _conversation.AddSystemMessage(msg.Content);
+        //     else
+        //         _conversation.AddUserMessage(msg.Content);
+        // }
 
-        var result = await chatClient.SendAsync(_conversation.Messages, step, ct);
+        // var result = await chatClient.SendAsync(_conversation.Messages, step, ct);
 
-        _conversation.AddAssistantMessage(result.Output);
+        // _conversation.AddAssistantMessage(result.Output);
 
-        ApplyStepOutcome(step, result, writer, context);
+        // ApplyStepOutcome(step, result, writer, context);
 
-        return result;
+        // return result;
+        return chainResult ?? new StepResult("Step execution did not produce a result.", false);
     }
 
     private void ApplyStepOutcome(AgentStep step, StepResult result, ISessionWriter writer, IAgentRunContext? context)

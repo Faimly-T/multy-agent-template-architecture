@@ -56,6 +56,18 @@ public class Role
 
         return sb.ToString();
     }
+
+    public string BuildRolePrompt() => $"""
+        You are {Identity.Persona}.
+        Role: {Identity.Role}
+        Authority: {Identity.Authority}
+        Boundary: {Identity.Boundary}
+
+        Mandate: {Mandate}
+
+        Directives:
+        {string.Join("\n", FactsAndDirectives.Select(d => $"- {d}"))}
+        """;
 }
 
 public class Identity

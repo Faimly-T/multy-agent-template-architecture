@@ -9,8 +9,17 @@ internal static class TestSteps
     public static StepPipeline DefaultPipeline() =>
         UxStepBuilder.Create().WithSteps(DefaultSteps()).WithSkills(DefaultSkills()).Build();
 
-    public static IEnumerable<Skill> DefaultSkills() =>
-        DefaultSteps().Select(s => SkillParser.ParseFromMarkdown(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
+    public static IEnumerable<Skill> DefaultSkills()
+    {
+        foreach (var step in DefaultSteps())
+        {
+            var filePath = $"TestData/Skills/{step.SkillName}.md";
+            if (File.Exists(filePath))
+                yield return SkillParser.ParseFromMarkdown(File.ReadAllText(filePath));
+            else
+                yield return null;
+        }
+    }
 
     public static AgentStep[] DefaultSteps() =>
     [

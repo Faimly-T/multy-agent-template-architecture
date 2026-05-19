@@ -25,7 +25,7 @@ public class AgentSession
     internal Checkpoint BeginIteration(string objective)
     {
         var cp = new Checkpoint(
-            Date: DateTime.UtcNow,
+            CreatedAt: DateTime.UtcNow,
             SessionIteration: _checkpoints.Count + 1,
             SessionObjective: objective,
             TokensConsumption: new TokenConsumption(0, 0));

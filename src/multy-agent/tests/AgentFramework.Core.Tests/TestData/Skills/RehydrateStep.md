@@ -1,5 +1,5 @@
 ---
-name: rehydrate-context
+name: RehydrateStep
 description: Define objective for agent and reconstruct session from prior state.
 ---
 

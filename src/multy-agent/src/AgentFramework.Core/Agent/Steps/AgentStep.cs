@@ -31,7 +31,7 @@ public abstract class AgentStep
 
     internal void AttachSkill(Skill skill) => Skill = skill;
 
-    public virtual Task<StepResult?> ExecuteChainAsync(
+    public virtual Task<StepResult?> ExecuteStepAsync(
         IAgentRunContext? context,
         ISessionWriter writer,
         IChatClient chatClient,

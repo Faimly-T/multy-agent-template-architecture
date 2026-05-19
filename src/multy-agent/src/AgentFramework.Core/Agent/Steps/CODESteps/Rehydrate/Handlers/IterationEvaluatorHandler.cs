@@ -4,9 +4,9 @@ using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
 
-internal sealed class IterationEvaluatorHandler : IRehydrateContextHandler
+internal sealed class IterationEvaluatorHandler : ICommandHandler
 {
-    public Task<HandlerExchange> HandleAsync(
+    public Task<HandlerExchange> ExecuteAiCommandAsync(
         HandlerExchange? previousExchange,
         IAgentRunContext? context, ISessionWriter writer,
         IChatClient _, CancellationToken ct)

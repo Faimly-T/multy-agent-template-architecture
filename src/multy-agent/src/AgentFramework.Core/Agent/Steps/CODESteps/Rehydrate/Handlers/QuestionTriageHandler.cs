@@ -6,7 +6,7 @@ using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
 
-internal sealed class QuestionTriageHandler(IMarkFileReader reader) : IRehydrateContextHandler
+internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHandler
 {
     private const string SystemPrompt =
         "You are triaging open questions from a prior agent session. " +
@@ -22,7 +22,7 @@ internal sealed class QuestionTriageHandler(IMarkFileReader reader) : IRehydrate
         }
         """;
 
-    public async Task<HandlerExchange> HandleAsync(
+    public async Task<HandlerExchange> ExecuteAiCommandAsync(
         HandlerExchange? previousExchange,
         IAgentRunContext? context, ISessionWriter writer,
         IChatClient chatClient, CancellationToken ct)

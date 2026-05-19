@@ -10,14 +10,23 @@ namespace AgentFramework.Core.Agent.Steps.CODESteps;
 public class RehydrateStep : AgentStep
 {
     private readonly IMarkFileReader _markFileReader;
-
-    public RehydrateStep(int stepNumber, string name, string instructions, Gate gate,
+    
+    public RehydrateStep(
+        int stepNumber, 
+        string name, 
+        string instructions, 
+        Gate gate,
         IMarkFileReader? markFileReader = null)
-        : base(stepNumber, name, "rehydrate-context", instructions, gate)
+        : base(stepNumber, 
+            name, 
+            nameof(RehydrateStep),
+            instructions, 
+            gate)
     {
         _markFileReader = markFileReader ?? new NullMarkFileReader();
     }
 
+    //TODO: Move this to the cosmos information to avoid hardcoding it in the step
     public override string JsonResponseSchema => """
         {
           "sessionObjective": "string — verb + deliverable + success condition + stakes clause",
@@ -33,7 +42,7 @@ public class RehydrateStep : AgentStep
 
     public List<HandlerExchange> Journal { get; } = [];
 
-    public override async Task<StepResult?> ExecuteChainAsync(
+    public override async Task<StepResult?> ExecuteStepAsync(
         IAgentRunContext? context,
         ISessionWriter writer,
         IChatClient chatClient,
@@ -42,10 +51,11 @@ public class RehydrateStep : AgentStep
         CancellationToken ct = default)
     {
         var chain = new RehydrateContextChain(
+            new CheckpointValidatorCommand(),
             new MarkFileLoaderHandler(_markFileReader),
             new IterationEvaluatorHandler(),
             new QuestionTriageHandler(_markFileReader),
-            new ObjectiveSynthesisHandler(role, Skill));
+            new ObjectiveSynthesisHandler(Skill));
 
         var (finalJson, journal) = await chain.RunAsync(context, writer, chatClient, ct);
 
@@ -99,6 +109,7 @@ public class RehydrateStep : AgentStep
         public Task<string?> ReadDistillHistoryAsync(CancellationToken ct) => Task.FromResult<string?>(null);
     }
 }
+
 
 public record RehydrateBlocker(string QuestionId, string Text, string Severity);
 

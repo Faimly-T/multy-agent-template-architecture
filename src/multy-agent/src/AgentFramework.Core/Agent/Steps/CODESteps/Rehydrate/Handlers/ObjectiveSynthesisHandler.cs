@@ -5,7 +5,7 @@ using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
 
-internal sealed class ObjectiveSynthesisHandler(Role? role = null, Skill? skill = null) : IRehydrateContextHandler
+internal sealed class ObjectiveSynthesisHandler(Skill? skill = null) : ICommandHandler
 {
     private const string SynthesisInstruction =
         "Synthesize a precise session objective from the context below. " +
@@ -22,12 +22,16 @@ internal sealed class ObjectiveSynthesisHandler(Role? role = null, Skill? skill 
         }
         """;
 
-    public async Task<HandlerExchange> HandleAsync(
+    public async Task<HandlerExchange> ExecuteAiCommandAsync(
         HandlerExchange? previousExchange,
-        IAgentRunContext? context, ISessionWriter writer,
-        IChatClient chatClient, CancellationToken ct)
+        IAgentRunContext? contextAgent, 
+        ISessionWriter writer,
+        IChatClient chatClient, 
+        CancellationToken ct)
     {
-        var messages = BuildMessages(previousExchange?.Content.Output ?? string.Empty, context?.Session);
+        var messages = BuildMessages(
+            previousExchange?.Content.Output ?? string.Empty, 
+            contextAgent);
 
         var json = await chatClient.SendHandlerAsync(messages, Schema, root => root.GetRawText(), ct);
 
@@ -37,19 +41,21 @@ internal sealed class ObjectiveSynthesisHandler(Role? role = null, Skill? skill 
             new HandlerMetadata(previousExchange?.Sender, IsLlmCall: true));
     }
 
-    private IReadOnlyList<ChatMessage> BuildMessages(string triageContext, AgentSession? session)
+    private IReadOnlyList<ChatMessage> BuildMessages(
+        string triageContext, 
+        IAgentRunContext? context)
     {
         var systemParts = new List<string>();
 
-        if (role is not null)
-            systemParts.Add(BuildRolePrompt(role));
+        if (context?.Role is not null)
+            systemParts.Add(context.Role.BuildRolePrompt());
 
         if (skill is not null)
             systemParts.Add($"### Skill: {skill.Name}\n{skill.Instructions}");
 
         systemParts.Add(SynthesisInstruction);
 
-        var userInput = session?.CurrentCheckpoint?.SessionObjective;
+        var userInput = context?.Session?.CurrentCheckpoint?.SessionObjective;
         var userInputLine = string.IsNullOrWhiteSpace(userInput)
             ? string.Empty
             : $"\nUser stated intent: {userInput}\n";
@@ -72,16 +78,4 @@ internal sealed class ObjectiveSynthesisHandler(Role? role = null, Skill? skill 
             new ChatMessage(MessageRole.User, userContent)
         ];
     }
-
-    private static string BuildRolePrompt(Role r) => $"""
-        You are {r.Identity.Persona}.
-        Role: {r.Identity.Role}
-        Authority: {r.Identity.Authority}
-        Boundary: {r.Identity.Boundary}
-
-        Mandate: {r.Mandate}
-
-        Directives:
-        {string.Join("\n", r.FactsAndDirectives.Select(d => $"- {d}"))}
-        """;
 }

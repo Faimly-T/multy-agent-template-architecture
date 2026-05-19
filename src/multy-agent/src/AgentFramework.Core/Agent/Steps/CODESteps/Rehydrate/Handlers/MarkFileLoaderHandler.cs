@@ -5,16 +5,27 @@ using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
 
-internal sealed class MarkFileLoaderHandler : IRehydrateContextHandler
+internal sealed class MarkFileLoaderHandler : ICommandHandler
 {
     private readonly IMarkFileReader _reader;
 
     public MarkFileLoaderHandler(IMarkFileReader reader) => _reader = reader;
 
-    public async Task<HandlerExchange> HandleAsync(
+    /// <summary>
+    /// This is the first method to read and understand the previous mark file with the context
+    /// </summary>
+    /// <param name="previousExchange"></param>
+    /// <param name="context"></param>
+    /// <param name="writer"></param>
+    /// <param name="_"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    public async Task<HandlerExchange> ExecuteAiCommandAsync(
         HandlerExchange? previousExchange,
-        IAgentRunContext? context, ISessionWriter writer,
-        IChatClient _, CancellationToken ct)
+        IAgentRunContext? context, 
+        ISessionWriter writer,
+        IChatClient _, 
+        CancellationToken ct)
     {
         var session = context?.Session;
         if (session is null)

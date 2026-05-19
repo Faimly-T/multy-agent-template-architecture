@@ -39,7 +39,9 @@ public class UxStepBuilder
 
     private void AttachSkills()
     {
-        var skillMap = _skills!.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
+        var skillMap = _skills!
+            .Where(s => s is not null)
+            .ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
 
         foreach (var step in _steps)
         {

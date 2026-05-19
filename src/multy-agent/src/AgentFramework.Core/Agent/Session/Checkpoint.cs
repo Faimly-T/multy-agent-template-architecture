@@ -1,7 +1,8 @@
 namespace AgentFramework.Core.Agent.Session;
 
 public record Checkpoint(
-    DateTime Date,
+    DateTime CreatedAt,
     int SessionIteration,
     string SessionObjective,
-    TokenConsumption TokensConsumption);
+    TokenConsumption TokensConsumption,
+    List<string>? Accomplishments = null);

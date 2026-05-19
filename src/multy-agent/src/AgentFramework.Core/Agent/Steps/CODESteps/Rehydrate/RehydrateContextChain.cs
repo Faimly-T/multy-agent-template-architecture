@@ -6,9 +6,9 @@ namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate;
 
 internal sealed class RehydrateContextChain
 {
-    private readonly IReadOnlyList<IRehydrateContextHandler> _handlers;
+    private readonly IReadOnlyList<ICommandHandler> _handlers;
 
-    public RehydrateContextChain(params IRehydrateContextHandler[] handlers)
+    public RehydrateContextChain(params ICommandHandler[] handlers)
     {
         _handlers = handlers;
     }
@@ -24,7 +24,7 @@ internal sealed class RehydrateContextChain
 
         foreach (var handler in _handlers)
         {
-            lastExchange = await handler.HandleAsync(lastExchange, context, writer, chatClient, ct);
+            lastExchange = await handler.ExecuteAiCommandAsync(lastExchange, context, writer, chatClient, ct);
             journal.Add(lastExchange);
         }
 

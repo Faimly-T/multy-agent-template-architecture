@@ -37,7 +37,7 @@ public class SessionTests
         var session = agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         var after = DateTime.UtcNow;
 
-        Assert.InRange(session.CurrentCheckpoint!.Date, before, after);
+        Assert.InRange(session.CurrentCheckpoint!.CreatedAt, before, after);
     }
 
     [Fact]
