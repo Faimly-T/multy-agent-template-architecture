@@ -1,13 +1,13 @@
 using System.Text.Json;
-using AgentFramework.Core.Agent.Events;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
 
 public class ExpressStep : AgentStep
 {
-    public ExpressStep(int stepNumber, string name, string instructions, Gate gate)
-        : base(stepNumber, name, "express-relay", instructions, gate) { }
+    public ExpressStep(IStepPromptLayer stepContext, int stepNumber, string instructions, Gate gate)
+        : base(stepContext, stepNumber, "express-relay", instructions, gate) { }
 
     public override string JsonResponseSchema => """
         {
@@ -113,17 +113,6 @@ public record ExpressResult(
             else
                 writer.ReviewQuestion(q.Id, status);
         }
-    }
-
-    public override IEnumerable<DomainEvent> GetDomainEvents()
-    {
-        var newQuestions = Questions.Where(q =>
-            string.Equals(q.Status, "open", StringComparison.OrdinalIgnoreCase)).ToList();
-        var reviewedCount = Questions.Count(q =>
-            string.Equals(q.Status, "reviewed", StringComparison.OrdinalIgnoreCase));
-
-        if (newQuestions.Any() || reviewedCount > 0)
-            yield return new QuestionsUpdated(newQuestions, reviewedCount);
     }
 }
 

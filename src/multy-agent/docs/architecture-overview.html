@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Agent Framework — Architecture Overview</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --card:      #1c2333;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --accent2:   #7ee787;
+      --accent3:   #f78166;
+      --accent4:   #d2a8ff;
+      --accent5:   #ffa657;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --code-bg:   #0d1117;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 15px;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(13,17,23,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 28px; height: 52px;
+    }
+    nav .logo { font-weight: 700; font-size: 14px; color: var(--accent); letter-spacing: .5px; margin-right: 16px; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 4px 10px; border-radius: 6px; transition: all .15s; }
+    nav a:hover { color: var(--text); background: var(--card); }
+
+    /* ── Layout ── */
+    .page { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 72px 0 56px;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(88,166,255,.12);
+      color: var(--accent);
+      font-size: 12px; font-weight: 600; letter-spacing: 1px;
+      padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(88,166,255,.3);
+      margin-bottom: 20px; text-transform: uppercase;
+    }
+    .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: -1px; line-height: 1.15; margin-bottom: 20px; }
+    .hero h1 span { background: linear-gradient(135deg, var(--accent), var(--accent4)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 18px; color: var(--muted); max-width: 680px; margin-bottom: 36px; }
+    .hero-pills { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px solid var(--border);
+      padding: 6px 14px; border-radius: 20px; font-size: 13px; color: var(--text);
+    }
+    .pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    /* ── Section ── */
+    section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+    section:last-child { border-bottom: none; }
+    .section-label { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+    h2 { font-size: 30px; font-weight: 700; margin-bottom: 14px; }
+    h3 { font-size: 19px; font-weight: 600; margin-bottom: 10px; }
+    p { color: #c9d1d9; margin-bottom: 14px; }
+    p:last-child { margin-bottom: 0; }
+
+    /* ── Grid helpers ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+    @media(max-width:800px) { .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; } }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .card.accent-blue  { border-top: 3px solid var(--accent); }
+    .card.accent-green { border-top: 3px solid var(--accent2); }
+    .card.accent-red   { border-top: 3px solid var(--accent3); }
+    .card.accent-purple{ border-top: 3px solid var(--accent4); }
+    .card.accent-orange{ border-top: 3px solid var(--accent5); }
+
+    .card-icon { font-size: 28px; margin-bottom: 14px; }
+    .card h3 { font-size: 16px; margin-bottom: 8px; }
+    .card p  { font-size: 14px; color: var(--muted); }
+    .tag {
+      display: inline-block;
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 4px; margin-right: 4px; margin-bottom: 4px;
+    }
+    .tag-blue   { background: rgba(88,166,255,.15);  color: var(--accent);  border: 1px solid rgba(88,166,255,.3);  }
+    .tag-green  { background: rgba(126,231,135,.15); color: var(--accent2); border: 1px solid rgba(126,231,135,.3); }
+    .tag-purple { background: rgba(210,168,255,.15); color: var(--accent4); border: 1px solid rgba(210,168,255,.3); }
+    .tag-orange { background: rgba(255,166,87,.15);  color: var(--accent5); border: 1px solid rgba(255,166,87,.3);  }
+    .tag-red    { background: rgba(247,129,102,.15); color: var(--accent3); border: 1px solid rgba(247,129,102,.3); }
+
+    /* ── Code block ── */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 22px;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      margin: 16px 0;
+    }
+    .kw  { color: #ff7b72; }
+    .ty  { color: #79c0ff; }
+    .cm  { color: #8b949e; font-style: italic; }
+    .st  { color: #a5d6ff; }
+    .fn  { color: #d2a8ff; }
+    .va  { color: #ffa657; }
+    .nu  { color: #79c0ff; }
+
+    /* ── Callout ── */
+    .callout {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 16px 20px; border-radius: 10px; margin: 20px 0;
+    }
+    .callout-info    { background: rgba(88,166,255,.1);  border: 1px solid rgba(88,166,255,.25); }
+    .callout-success { background: rgba(126,231,135,.1); border: 1px solid rgba(126,231,135,.25); }
+    .callout-warn    { background: rgba(255,166,87,.1);  border: 1px solid rgba(255,166,87,.25); }
+    .callout-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+    .callout p { font-size: 14px; color: var(--text); margin: 0; }
+
+    /* ── Table ── */
+    .tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: var(--surface); padding: 12px 16px; text-align: left; font-size: 12px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 12px 16px; border-bottom: 1px solid rgba(48,54,61,.6); color: #c9d1d9; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+    td code, th code { font-family: 'SF Mono', monospace; font-size: 12px; background: rgba(88,166,255,.1); color: var(--accent); padding: 1px 5px; border-radius: 4px; }
+
+    /* ── Flow diagram ── */
+    .flow {
+      display: flex; align-items: stretch; gap: 0;
+      overflow-x: auto; padding: 8px 0;
+    }
+    .flow-step {
+      flex: 1; min-width: 160px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 16px;
+      position: relative;
+      transition: border-color .2s;
+    }
+    .flow-step:hover { border-color: var(--accent); }
+    .flow-arrow {
+      display: flex; align-items: center;
+      color: var(--muted); font-size: 20px;
+      padding: 0 4px; flex-shrink: 0;
+    }
+    .flow-num { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .flow-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .flow-desc { font-size: 12px; color: var(--muted); }
+    .flow-badge { margin-bottom: 10px; }
+
+    /* ── Layer stack ── */
+    .layer-stack { display: flex; flex-direction: column; gap: 12px; }
+    .layer {
+      border-radius: 10px; padding: 20px 24px;
+      display: flex; align-items: center; gap: 20px;
+      border: 1px solid var(--border);
+    }
+    .layer-icon { font-size: 28px; flex-shrink: 0; width: 44px; text-align: center; }
+    .layer h3 { font-size: 15px; margin-bottom: 4px; }
+    .layer p  { font-size: 13px; color: var(--muted); margin: 0; }
+    .layer-l1 { background: linear-gradient(90deg, rgba(88,166,255,.08) 0%, transparent 100%);  border-left: 3px solid var(--accent);  }
+    .layer-l2 { background: linear-gradient(90deg, rgba(210,168,255,.08) 0%, transparent 100%); border-left: 3px solid var(--accent4); }
+    .layer-l3 { background: linear-gradient(90deg, rgba(126,231,135,.08) 0%, transparent 100%); border-left: 3px solid var(--accent2); }
+
+    /* ── Interface type-state ── */
+    .ts-chain {
+      display: flex; flex-direction: column; gap: 0;
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    .ts-row {
+      display: grid; grid-template-columns: 180px 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .ts-row:last-child { border-bottom: none; }
+    .ts-cell { padding: 14px 18px; font-size: 13px; }
+    .ts-head { background: var(--surface); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+    /* ── Steps guide ── */
+    .steps-list { display: flex; flex-direction: column; gap: 16px; }
+    .step-item {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px;
+    }
+    .step-circle {
+      flex-shrink: 0; width: 32px; height: 32px;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
+    }
+    .step-body h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .step-body p  { font-size: 13px; color: var(--muted); margin: 0; }
+
+    /* ── Separator ── */
+    hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+    /* ── Footer ── */
+    footer { text-align: center; padding: 40px 0; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); margin-top: 20px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ NAV ══ -->
+<nav>
+  <span class="logo">⚙ AgentFramework</span>
+  <a href="#why">Why Multi-Agent</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#code">CODE Phases</a>
+  <a href="#patterns">Key Patterns</a>
+  <a href="#skills">Skills</a>
+  <a href="#building">Build an Agent</a>
+  <a href="#session">Session Memory</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ HERO ══ -->
+<div class="page">
+<div class="hero">
+  <div class="hero-badge">Architecture Overview · v2.0</div>
+  <h1>A Framework for<br/><span>Structured Multi-Agent Systems</span></h1>
+  <p>
+    Build AI agents in C# that think in phases, carry memory across sessions, compose skills
+    dynamically, and produce structured, auditable outputs — without rewriting the same
+    plumbing every time.
+  </p>
+  <div class="hero-pills">
+    <div class="pill"><div class="dot" style="background:#58a6ff"></div> .NET 8 / C#</div>
+    <div class="pill"><div class="dot" style="background:#d2a8ff"></div> Claude / OpenAI compatible</div>
+    <div class="pill"><div class="dot" style="background:#7ee787"></div> CODE 5-Phase Relay</div>
+    <div class="pill"><div class="dot" style="background:#ffa657"></div> DDD Aggregate pattern</div>
+    <div class="pill"><div class="dot" style="background:#f78166"></div> Immutable Prompt Composition</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ WHY ══ -->
+<section id="why">
+  <div class="section-label">The Problem</div>
+  <h2>Why Multi-Agent? Why a Framework?</h2>
+  <p>
+    When you interact with Claude or ChatGPT, a single conversation handles everything: asking,
+    reasoning, answering. That works well for simple tasks. But for <strong>complex, multi-step
+    knowledge work</strong> — designing products, producing research, generating architecture documents —
+    a single AI session hits limits fast: context overflow, no memory of prior sessions, no
+    specialisation, no quality gates.
+  </p>
+
+  <div class="grid-3" style="margin-top:28px">
+    <div class="card accent-red">
+      <div class="card-icon">🧠</div>
+      <h3>Context Window Problem</h3>
+      <p>AI models have a fixed context window. Long tasks exceed it. Multi-agent splits the work across phases, each with a focused context.</p>
+    </div>
+    <div class="card accent-red">
+      <div class="card-icon">🔁</div>
+      <h3>No Session Memory</h3>
+      <p>Each ChatGPT/Claude conversation starts fresh. Agents in this framework persist state in MARK files and resume exactly where they left off.</p>
+    </div>
+    <div class="card accent-red">
+      <div class="card-icon">🎯</div>
+      <h3>One Model Does Everything</h3>
+      <p>A single agent tries to capture, organise, distill, and express simultaneously. Specialists outperform generalists — even in AI.</p>
+    </div>
+  </div>
+
+  <div class="callout callout-success" style="margin-top:28px">
+    <div class="callout-icon">✅</div>
+    <p><strong>This framework's answer:</strong> Each agent follows the same 5-phase CODE relay — capturing raw ideas, organising them, distilling them into concrete results, and expressing them as deliverables. A pipeline of typed steps enforces quality gates at every transition. Memory persists as structured markdown files across sessions.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ ARCHITECTURE ══ -->
+<section id="architecture">
+  <div class="section-label">Architecture</div>
+  <h2>Three-Layer Architecture</h2>
+  <p>The framework is split into three projects following clean architecture principles — each layer depends only on the one above it.</p>
+
+  <div class="layer-stack" style="margin-top:28px">
+    <div class="layer layer-l3">
+      <div class="layer-icon">🔌</div>
+      <div>
+        <h3><code>AgentFramework.Infrastructure</code> — Adapters</h3>
+        <p>Connects abstractions to the real world. <strong>AnthropicChatClient</strong> talks to Claude's API. <strong>FileSkillResolver</strong> reads SKILL.md files from disk. <strong>ServiceCollectionExtensions</strong> wires everything into .NET DI. Swap Claude for any other model by replacing this layer only.</p>
+      </div>
+    </div>
+    <div class="layer layer-l2">
+      <div class="layer-icon">🤖</div>
+      <div>
+        <h3><code>AgentFramework.Domain</code> — Agents</h3>
+        <p>Where domain-specific agents live. <strong>UxPersona</strong> is an example: it extends <code>AgentAggregate</code>, declares its steps via <code>UxStepBuilder</code>, and inherits all session management, question tracking, and prompt composition for free.</p>
+      </div>
+    </div>
+    <div class="layer layer-l1">
+      <div class="layer-icon">⚙️</div>
+      <div>
+        <h3><code>AgentFramework.Core</code> — Framework</h3>
+        <p>The engine. Contains <strong>AgentAggregate</strong>, <strong>PromptContext</strong>, the <strong>CODE step types</strong>, the <strong>KickoffChain</strong> handlers, all interfaces (ports), session domain objects (Question, Decision, Deliverable, IslandBacklog), and the skill record types. No agent-specific logic here.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <h3>Key files at a glance</h3>
+  <div class="tbl-wrap" style="margin-top:16px">
+    <table>
+      <thead>
+        <tr><th>File</th><th>Layer</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>AgentAggregate.cs</code></td><td><span class="tag tag-blue">Core</span></td><td>The DDD Aggregate root. Every agent extends this. Owns Role, Session, Pipeline, Step results, Questions, Decisions, Deliverables.</td></tr>
+        <tr><td><code>PromptContext.cs</code></td><td><span class="tag tag-blue">Core</span></td><td>Immutable record. The only place in the codebase where <code>ChatMessage[]</code> are constructed. Implements three capability interfaces via Type State.</td></tr>
+        <tr><td><code>CommandHandlerBase.cs</code></td><td><span class="tag tag-blue">Core</span></td><td>Base class for all chain handlers. Provides skill resolution (Pattern A explicit / Pattern B LLM-driven) and message building.</td></tr>
+        <tr><td><code>KickoffStep.cs</code></td><td><span class="tag tag-blue">Core</span></td><td>Phase 1 step. Runs a 5-handler chain: validate checkpoint → load MARK files → evaluate iteration → triage questions → synthesise session objective.</td></tr>
+        <tr><td><code>CaptureStep / OrganizeStep / DistillStep / ExpressStep</code></td><td><span class="tag tag-blue">Core</span></td><td>Phases 2-5 of the CODE relay. Each produces typed results that <code>ApplyTo(ISessionWriter)</code> to mutate the aggregate state.</td></tr>
+        <tr><td><code>UxPersona.cs</code></td><td><span class="tag tag-purple">Domain</span></td><td>Example domain agent. Extends AgentAggregate&lt;string&gt;. Receives its steps via injection — no framework code inside.</td></tr>
+        <tr><td><code>AnthropicChatClient.cs</code></td><td><span class="tag tag-green">Infra</span></td><td>Claude API adapter. Implements <code>IChatClient</code>. Parses structured JSON responses from Claude into typed StepResults.</td></tr>
+        <tr><td><code>FileSkillResolver.cs</code></td><td><span class="tag tag-green">Infra</span></td><td>Reads SKILL.md files from disk. <code>GetCatalogAsync</code> reads frontmatter only (fast). <code>ResolveAsync</code> reads full content only for selected skills.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ CODE ══ -->
+<section id="code">
+  <div class="section-label">Methodology</div>
+  <h2>The CODE 5-Phase Relay</h2>
+  <p>
+    Every agent runs the same five phases in strict order — adapted from Tiago Forte's
+    <em>Capture → Organize → Distill → Express</em> methodology for AI agent workflows.
+    Think of it as an assembly line where each station produces a typed artefact that the
+    next station consumes.
+  </p>
+
+  <div class="flow" style="margin-top:28px; gap:6px;">
+    <div class="flow-step">
+      <div class="flow-num" style="color:var(--accent)">Phase 1</div>
+      <div class="flow-badge"><span class="tag tag-blue">KickoffStep</span></div>
+      <div class="flow-name">Re-Hydrate</div>
+      <div class="flow-desc">Read MARK files from disk. Triage open questions. Synthesise a clear Session Objective. Gate: objective is well-formed.</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num" style="color:var(--accent4)">Phase 2</div>
+      <div class="flow-badge"><span class="tag tag-purple">CaptureStep</span></div>
+      <div class="flow-name">Capture</div>
+      <div class="flow-desc">DIVERGENT — generate an unfiltered Island Backlog. No judging. Quantity over quality. All ideas become typed islands.</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num" style="color:var(--accent2)">Phase 3</div>
+      <div class="flow-badge"><span class="tag tag-green">OrganizeStep</span></div>
+      <div class="flow-name">Organize</div>
+      <div class="flow-desc">CONVERGENT — deduplicate, cluster, and sequence the backlog. Produce an Execution Roadmap. Record architectural decisions.</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num" style="color:var(--accent5)">Phase 4</div>
+      <div class="flow-badge"><span class="tag tag-orange">DistillStep</span></div>
+      <div class="flow-name">Distill</div>
+      <div class="flow-desc">Process each island into a concrete Result or formal Concern. Expert synthesis — the AI produces the actual deliverable content.</div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">
+      <div class="flow-num" style="color:var(--accent3)">Phase 5</div>
+      <div class="flow-badge"><span class="tag tag-red">ExpressStep</span></div>
+      <div class="flow-name">Express &amp; Relay</div>
+      <div class="flow-desc">Write artifacts to disk. Update MARK files (including token usage). Emit a System Relay for orchestrator or next agent.</div>
+    </div>
+  </div>
+
+  <div class="callout callout-info" style="margin-top:24px">
+    <div class="callout-icon">💡</div>
+    <p><strong>The DIVERGENT → CONVERGENT boundary matters.</strong> Phase 2 (Capture) generates freely with no filtering. Phase 3 (Organize) then applies rigour. This prevents the common failure mode where the AI self-censors good ideas too early.</p>
+  </div>
+
+  <hr/>
+  <h3>What each step produces</h3>
+  <div class="tbl-wrap" style="margin-top:12px">
+    <table>
+      <thead><tr><th>Step</th><th>Input from prior step</th><th>Typed output</th><th>Applied to aggregate via</th></tr></thead>
+      <tbody>
+        <tr><td><code>KickoffStep</code></td><td>MARK files + user intent</td><td><code>KickoffResult</code> — session objective, narrative bridge, blockers</td><td><code>writer.BeginIteration(objective)</code></td></tr>
+        <tr><td><code>CaptureStep</code></td><td>Session objective</td><td><code>CaptureResult</code> — list of typed <code>CapturedIsland</code> records</td><td><code>writer.SetCapturedIslands(islands)</code></td></tr>
+        <tr><td><code>OrganizeStep</code></td><td>Island backlog</td><td><code>OrganizeResult</code> — sequenced islands + decisions</td><td><code>writer.ApplyOrganization(...)</code></td></tr>
+        <tr><td><code>DistillStep</code></td><td>Organised roadmap</td><td><code>DistillResult</code> — distillations + deliverable records</td><td><code>writer.ApplyDistillation(...)</code></td></tr>
+        <tr><td><code>ExpressStep</code></td><td>All session state</td><td>Written files + System Relay JSON</td><td>Side-effects only (files, MARK updates)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════ PATTERNS ══ -->
+<section id="patterns">
+  <div class="section-label">Key Design Patterns</div>
+  <h2>How the Framework Is Built</h2>
+  <p>Three interlocking patterns make the framework work. Understanding them unlocks the ability to extend it safely.</p>
+
+  <!-- Pattern 1: AgentAggregate -->
+  <div class="card" style="margin-top:28px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:24px">🏛️</span>
+      <div>
+        <h3 style="margin:0">Pattern 1 — DDD Aggregate (<code>AgentAggregate&lt;TId&gt;</code>)</h3>
+        <span class="tag tag-blue">Domain-Driven Design</span>
+      </div>
+    </div>
+    <p>The <strong>AgentAggregate</strong> is the single source of truth for an agent's runtime state. It owns everything: Role, Session, Pipeline, and the lists of Questions, Decisions, and Deliverables. Nothing mutates these directly — all writes go through role interfaces (<code>ISessionWriter</code>, <code>IQuestionWriter</code>, etc.), enforcing an invariant boundary.</p>
+    <p>Domain agents (like <code>UxPersona</code>) extend <code>AgentAggregate&lt;string&gt;</code> and receive their steps as a dependency — they never contain framework mechanics themselves.</p>
+    <pre><span class="cm">// AgentAggregate owns execution — call one step at a time:</span>
+<span class="kw">var</span> <span class="va">result</span> = <span class="kw">await</span> agent.<span class="fn">ExecuteNextStepAsync</span>(chatClient, ct);
+
+<span class="cm">// Or run all steps to completion in one call:</span>
+<span class="kw">var</span> <span class="va">runResult</span> = <span class="kw">await</span> agent.<span class="fn">RunAsync</span>(userIntent, chatClient, writer, pipelineFactory, ct);
+
+<span class="cm">// Questions, decisions, deliverables are automatically tracked:</span>
+<span class="ty">IReadOnlyList</span>&lt;<span class="ty">Question</span>&gt;   questions   = agent.Questions;
+<span class="ty">IReadOnlyList</span>&lt;<span class="ty">Decision</span>&gt;   decisions   = agent.Decisions;
+<span class="ty">IReadOnlyList</span>&lt;<span class="ty">Deliverable</span>&gt; deliverables = agent.Deliverables;</pre>
+  </div>
+
+  <!-- Pattern 2: PromptContext Type State -->
+  <div class="card" style="margin-top:20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:24px">🔒</span>
+      <div>
+        <h3 style="margin:0">Pattern 2 — Type State (<code>PromptContext</code>)</h3>
+        <span class="tag tag-purple">Immutable records</span> <span class="tag tag-blue">Interface segregation</span>
+      </div>
+    </div>
+    <p>
+      <strong>PromptContext</strong> is a single sealed immutable record that implements three interfaces —
+      one for each architectural layer. Each layer receives only the interface it's allowed to use.
+      This prevents a lower layer from accidentally reading the role, or a higher layer from calling
+      <code>BuildMessages</code> prematurely.
+    </p>
+
+    <div class="ts-chain" style="margin:16px 0">
+      <div class="ts-row ts-head">
+        <div class="ts-cell">Interface</div>
+        <div class="ts-cell">Who receives it</div>
+        <div class="ts-cell">What they can do</div>
+      </div>
+      <div class="ts-row">
+        <div class="ts-cell"><code style="color:var(--accent)">IAgentPromptLayer</code></div>
+        <div class="ts-cell"><code>AgentAggregate</code></div>
+        <div class="ts-cell"><code>.WithRole(Role)</code> → returns <code>IStepPromptLayer</code></div>
+      </div>
+      <div class="ts-row">
+        <div class="ts-cell"><code style="color:var(--accent4)">IStepPromptLayer</code></div>
+        <div class="ts-cell"><code>AgentStep</code>, <code>CommandHandlerBase</code></div>
+        <div class="ts-cell"><code>.WithSkills()</code>, <code>.RoleOnly</code>, <code>.ForCommand</code></div>
+      </div>
+      <div class="ts-row">
+        <div class="ts-cell"><code style="color:var(--accent2)">ICommandPromptLayer</code></div>
+        <div class="ts-cell">Inside <code>ResolveAndBuildAsync</code> only — ephemeral</div>
+        <div class="ts-cell"><code>.BuildMessages(instruction, userContent)</code> — produces <code>ChatMessage[]</code></div>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <div class="callout-icon">⚠️</div>
+      <p><strong>Key invariant:</strong> <code>ICommandPromptLayer.BuildMessages</code> is the <em>only</em> place in the entire codebase where <code>ChatMessage[]</code> are created. It is never stored — only consumed immediately by <code>IChatClient</code>.</p>
+    </div>
+
+    <pre><span class="cm">// Context flows downward — each layer enriches immutably:</span>
+
+<span class="cm">// Aggregate level (IAgentPromptLayer):</span>
+<span class="ty">IStepPromptLayer</span> <span class="va">ctx</span> = <span class="ty">PromptContext</span>.Empty.<span class="fn">WithRole</span>(Role);  <span class="cm">// cached lazily</span>
+
+<span class="cm">// Step/command level (IStepPromptLayer):</span>
+<span class="kw">var</span> <span class="va">withSkills</span> = ctx.<span class="fn">WithSkills</span>(resolvedSkills).<span class="fn">ForCommand</span>;
+
+<span class="cm">// Terminal — ephemeral inside ResolveAndBuildAsync (ICommandPromptLayer):</span>
+<span class="ty">IReadOnlyList</span>&lt;<span class="ty">ChatMessage</span>&gt; <span class="va">msgs</span> = withSkills.<span class="fn">BuildMessages</span>(instruction, userContent);</pre>
+  </div>
+
+  <!-- Pattern 3: CommandHandlerBase Chain -->
+  <div class="card" style="margin-top:20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <span style="font-size:24px">⛓️</span>
+      <div>
+        <h3 style="margin:0">Pattern 3 — Context Chain (<code>CommandHandlerBase</code>)</h3>
+        <span class="tag tag-orange">Chain of Responsibility</span> <span class="tag tag-green">Skill composition</span>
+      </div>
+    </div>
+    <p>
+      Inspired by Denis Rothman's <em>Context Engineering for Multi-Agent Systems</em>, the
+      <strong>KickoffChain</strong> runs five handlers in sequence. Each handler receives the
+      accumulated context from all prior handlers in the chain journal — progressive context
+      enrichment without a monolithic prompt.
+    </p>
+    <p>
+      <code>CommandHandlerBase</code> is the abstract base for all AI-calling handlers. Subclasses
+      override <code>SynthesisInstruction</code> and optionally <code>SkillNames</code> or
+      <code>AutoSelectSkills</code>. The base class handles all the prompt assembly.
+    </p>
+
+    <div class="grid-2" style="margin-top:16px">
+      <div class="card accent-blue">
+        <h3>Pattern A — Explicit skill names</h3>
+        <p>Override <code>SkillNames</code> with a fixed list. The resolver fetches full instructions for exactly those skills, in that order. Deterministic — same skills every run.</p>
+        <pre style="margin-top:10px; font-size:12px"><span class="kw">protected override</span> <span class="ty">IReadOnlyList</span>&lt;<span class="ty">string</span>&gt; SkillNames
+    =&gt; [<span class="st">"kickoff-context-usingOKR"</span>];</pre>
+      </div>
+      <div class="card accent-purple">
+        <h3>Pattern B — LLM-driven selection</h3>
+        <p>Set <code>AutoSelectSkills = true</code>. The catalog (name + description only) is sent to the model. The model picks the relevant skills. Full instructions loaded only for selected ones.</p>
+        <pre style="margin-top:10px; font-size:12px"><span class="kw">protected override bool</span> AutoSelectSkills =&gt; <span class="kw">true</span>;</pre>
+      </div>
+    </div>
+
+    <h3 style="margin-top:24px">The KickoffChain — 5 handlers in sequence</h3>
+    <div class="tbl-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Handler</th><th>Type</th><th>What it produces</th></tr></thead>
+        <tbody>
+          <tr><td><code>CheckpointValidatorCommand</code></td><td><span class="tag tag-blue">LLM · Role only</span></td><td>Validates prior checkpoint — staleness, narrative bridge, gate status</td></tr>
+          <tr><td><code>MarkFileLoaderHandler</code></td><td><span class="tag tag-green">Deterministic</span></td><td>Reads MARK files from disk — no LLM, no context. Pure data loading.</td></tr>
+          <tr><td><code>IterationEvaluatorHandler</code></td><td><span class="tag tag-green">Deterministic</span></td><td>Evaluates iteration state from session data — no LLM call</td></tr>
+          <tr><td><code>QuestionTriageHandler</code></td><td><span class="tag tag-blue">LLM · Role only</span></td><td>Classifies each open question as resolved / obsolete / still-open with severity</td></tr>
+          <tr><td><code>ObjectiveSynthesisHandler</code></td><td><span class="tag tag-purple">LLM · Role + optional skills</span></td><td>Synthesises final session objective JSON from all prior handler outputs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ SKILLS ══ -->
+<section id="skills">
+  <div class="section-label">The Skill System</div>
+  <h2>Skills — Composable Instruction Modules</h2>
+  <p>
+    If you've used <strong>custom instructions in ChatGPT</strong> or <strong>system prompts in Claude</strong>,
+    you already understand skills conceptually. A skill is a block of markdown instructions that
+    tells the AI <em>how to perform a specific task</em>. The difference here is that skills are
+    files on disk, resolved lazily, and composed dynamically per command.
+  </p>
+
+  <div class="grid-3" style="margin-top:24px">
+    <div class="card">
+      <div class="card-icon">📄</div>
+      <h3>Skills are SKILL.md files</h3>
+      <p>Each skill is a markdown file with YAML frontmatter (<code>name</code>, <code>description</code>) and a body of instructions. Strategy is encoded in the name: <code>kickoff-context-usingOKR</code> vs <code>kickoff-context-usingSMART</code>.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🪶</div>
+      <h3>Lazy, lightweight loading</h3>
+      <p><code>GetCatalogAsync</code> reads only frontmatter — fast. <code>ResolveAsync</code> loads full instructions only for selected skills. The AI never sees instructions it doesn't need.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📐</div>
+      <h3>Ordered composition</h3>
+      <p>Skills are injected into the system prompt in the order they were requested. Order controls priority. The same skill appears differently depending on what precedes it.</p>
+    </div>
+  </div>
+
+  <hr/>
+
+  <h3>How a skill flows into a prompt</h3>
+  <p style="margin-bottom:16px">
+    When a handler calls <code>ResolveAndBuildAsync</code>, the final system message is assembled in this order:
+  </p>
+
+  <div class="card" style="padding: 0; overflow: hidden;">
+    <div style="background:var(--surface); padding:12px 20px; font-size:12px; color:var(--muted); font-weight:700; letter-spacing:.5px; text-transform:uppercase; border-bottom:1px solid var(--border)">
+      System message structure
+    </div>
+    <div style="padding:0">
+      <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(48,54,61,.5)">
+        <span style="background:rgba(88,166,255,.15);color:var(--accent);width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">1</span>
+        <div><strong>Role prompt</strong> — who the AI is, its mandate, facts &amp; directives. Set once at the Aggregate level via <code>WithRole(role)</code>.</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px; padding:14px 20px; border-bottom:1px solid rgba(48,54,61,.5)">
+        <span style="background:rgba(210,168,255,.15);color:var(--accent4);width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">2</span>
+        <div><strong>Skill blocks</strong> (0-N) — each resolved skill's instructions prepended with <code>### Skill: {name}</code>. Added at command level via <code>WithSkills(skills)</code>.</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px; padding:14px 20px;">
+        <span style="background:rgba(126,231,135,.15);color:var(--accent2);width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">3</span>
+        <div><strong>Synthesis instruction</strong> — the command-specific directive (what this particular handler needs the AI to do). From <code>SynthesisInstruction</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:12px; color:var(--muted); font-size:13px;">The user message carries the dynamic context: prior handler outputs, session data, MARK file content, open questions, and user intent.</div>
+
+  <hr/>
+  <h3>Skill record types</h3>
+  <div class="grid-2" style="margin-top:12px">
+    <div class="card accent-blue">
+      <h3><code>SkillSummary</code> — Catalog entry</h3>
+      <p>Lightweight: <code>Name</code> + <code>Description</code> only. Sent to the LLM for skill selection (Pattern B). Never contains full instructions — keeps the selection call cheap.</p>
+      <pre style="margin-top:10px;font-size:12px"><span class="kw">record</span> <span class="ty">SkillSummary</span>(<span class="ty">string</span> Name, <span class="ty">string</span> Description);</pre>
+    </div>
+    <div class="card accent-purple">
+      <h3><code>Skill</code> — Full record</h3>
+      <p>Complete: <code>Name</code> + <code>Description</code> + <code>Instructions</code>. Returned by <code>ResolveAsync</code> after selection. Instructions are injected verbatim into the system prompt.</p>
+      <pre style="margin-top:10px;font-size:12px"><span class="kw">record</span> <span class="ty">Skill</span>(<span class="ty">string</span> Name, <span class="ty">string</span> Description, <span class="ty">string</span> Instructions);</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ BUILDING ══ -->
+<section id="building">
+  <div class="section-label">Extension Guide</div>
+  <h2>Building a New Agent</h2>
+  <p>
+    Adding a new domain agent requires touching only the <strong>Domain</strong> and
+    <strong>Infrastructure</strong> layers. The Core framework is unchanged.
+    Here's what you need to create:
+  </p>
+
+  <div class="steps-list" style="margin-top:28px">
+    <div class="step-item">
+      <div class="step-circle" style="background:rgba(88,166,255,.15);color:var(--accent)">1</div>
+      <div class="step-body">
+        <h4>Create your Aggregate class</h4>
+        <p>Extend <code>AgentAggregate&lt;TId&gt;</code>. Declare your typed ID, accept a <code>Role</code> and <code>AgentStep[]</code> in the constructor, build the pipeline with <code>StepPipelineBuilder</code>. No framework mechanics inside.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-circle" style="background:rgba(210,168,255,.15);color:var(--accent4)">2</div>
+      <div class="step-body">
+        <h4>Author a ROLE.md file</h4>
+        <p>A markdown file with the agent's Identity (name, domain), Mandate (what it must achieve), and Facts &amp; Directives (domain rules the AI must never violate). Loaded by <code>RoleParser</code> at startup.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-circle" style="background:rgba(126,231,135,.15);color:var(--accent2)">3</div>
+      <div class="step-body">
+        <h4>Configure your Steps</h4>
+        <p>For each CODE phase, instantiate the matching step type (<code>KickoffStep</code>, <code>CaptureStep</code>, <code>OrganizeStep</code>, <code>DistillStep</code>, <code>ExpressStep</code>) with a step number, domain-specific instructions, and a Gate. Build the pipeline via your step builder.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-circle" style="background:rgba(255,166,87,.15);color:var(--accent5)">4</div>
+      <div class="step-body">
+        <h4>Write SKILL.md files (optional)</h4>
+        <p>If your agent uses skill-augmented steps, author SKILL.md files in the skills directory. Name them to encode strategy: <code>capture-ux-persona</code>, <code>distill-journey-map</code>. Each file has YAML frontmatter + markdown instructions.</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="step-circle" style="background:rgba(247,129,102,.15);color:var(--accent3)">5</div>
+      <div class="step-body">
+        <h4>Wire up in DI</h4>
+        <p>Register your agent, <code>IPipelineFactory</code> implementation, <code>ISkillResolver</code> (FileSkillResolver if using file-based skills), and <code>IChatClient</code> (AnthropicChatClient for Claude) in the DI container.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <h3>Minimal domain agent — complete example</h3>
+  <pre><span class="kw">public class</span> <span class="ty">ProductOwnerAgent</span> : <span class="ty">AgentAggregate</span>&lt;<span class="ty">string</span>&gt;
+{
+    <span class="kw">public</span> <span class="fn">ProductOwnerAgent</span>(
+        <span class="ty">Role</span>       role,
+        <span class="ty">AgentStep</span>[] steps,
+        <span class="ty">string</span>     projectId,
+        <span class="ty">SessionMarkFilePaths</span> markFilePaths)
+        : <span class="fn">base</span>(<span class="st">"product-owner-agent"</span>, role, projectId, markFilePaths)
+    {
+        Pipeline = <span class="kw">new</span> <span class="ty">StepPipelineBuilder</span>().<span class="fn">WithSteps</span>(steps).<span class="fn">Build</span>();
+    }
+}
+
+<span class="cm">// Steps configured externally (IPipelineFactory implementation):</span>
+<span class="kw">var</span> <span class="va">steps</span> = <span class="kw">new</span> <span class="ty">AgentStep</span>[]
+{
+    <span class="kw">new</span> <span class="ty">KickoffStep</span>(<span class="nu">1</span>, <span class="st">"Define the product vision objective"</span>,   Gate.Required, markReader, skillResolver),
+    <span class="kw">new</span> <span class="ty">CaptureStep</span>(<span class="nu">2</span>, <span class="st">"Capture all backlog ideas and requirements"</span>, Gate.Required),
+    <span class="kw">new</span> <span class="ty">OrganizeStep</span>(<span class="nu">3</span>, <span class="st">"Prioritise by business value and risk"</span>,    Gate.Required),
+    <span class="kw">new</span> <span class="ty">DistillStep</span>(<span class="nu">4</span>,  <span class="st">"Produce user stories and acceptance criteria"</span>,Gate.Required),
+    <span class="kw">new</span> <span class="ty">ExpressStep</span>(<span class="nu">5</span>,  <span class="st">"Write roadmap and update MARK files"</span>,       Gate.Required),
+};
+</pre>
+
+  <div class="callout callout-info">
+    <div class="callout-icon">💡</div>
+    <p><strong>Gate.Required vs Gate.Advisory:</strong> A <code>Required</code> gate halts pipeline progression if <code>gateSatisfied = false</code>. An <code>Advisory</code> gate records the warning but continues. Use Required for structural quality checks (e.g. "session objective must be well-formed") and Advisory for optional enrichment steps.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ SESSION ══ -->
+<section id="session">
+  <div class="section-label">Session Memory</div>
+  <h2>Persistence &amp; Cross-Session Continuity</h2>
+  <p>
+    Unlike a ChatGPT conversation that vanishes when you close the tab, agents in this framework
+    maintain structured memory across sessions through <strong>MARK files</strong> — versioned
+    markdown files written at the end of every session and read at the start of the next.
+  </p>
+
+  <div class="grid-3" style="margin-top:28px">
+    <div class="card accent-blue">
+      <div class="card-icon">📋</div>
+      <h3>Progress Summary MARK</h3>
+      <p>What was accomplished, what threads are open, the session momentum, and full token usage for every run. Read by <code>KickoffStep</code> at Phase 1.</p>
+      <div style="margin-top:10px"><code>{prefix}_Progress_Summary_MARK.md</code></div>
+    </div>
+    <div class="card accent-purple">
+      <div class="card-icon">❓</div>
+      <h3>Questions Log MARK</h3>
+      <p>All open, resolved, and obsolete questions the agent raised. Restored into the aggregate on session start. Triaged by <code>QuestionTriageHandler</code> automatically.</p>
+      <div style="margin-top:10px"><code>{prefix}_Questions_Log_MARK.md</code></div>
+    </div>
+    <div class="card accent-green">
+      <div class="card-icon">📚</div>
+      <h3>Distill History MARK</h3>
+      <p>Append-only log of every distillation run across all sessions: islands processed, decisions made, artifacts produced. The AI can reference prior work without starting over.</p>
+      <div style="margin-top:10px"><code>{prefix}_Distill_History_MARK.md</code></div>
+    </div>
+  </div>
+
+  <hr/>
+
+  <h3>Domain objects tracked inside the Aggregate</h3>
+  <div class="grid-3" style="margin-top:12px">
+    <div class="card">
+      <h3>❓ Questions</h3>
+      <p>Raised during any step. Status lifecycle: <code>Open → Answered → Reviewed</code> (or <code>Obsolete</code>). Can be answered between sessions via <code>agent.SupplyAnswers(...)</code>.</p>
+    </div>
+    <div class="card">
+      <h3>📌 Decisions</h3>
+      <p>Recorded during Organize phase. Each has an ID, description, and impact. Persisted to <code>ADR-XXX-{title}.md</code> files by the Express step.</p>
+    </div>
+    <div class="card">
+      <h3>📦 Deliverables</h3>
+      <p>Produced during Distill phase. Each has a path and a status (<code>Pending / Written / Failed</code>). Tracked so the orchestrator knows what was actually produced.</p>
+    </div>
+  </div>
+
+  <hr/>
+
+  <h3>Token budget tracking</h3>
+  <p>Every session records its token consumption in the Progress Summary MARK. This enables budget awareness across long-running projects:</p>
+  <pre><span class="cm">| Metric              | Value     |</span>
+<span class="cm">|---------------------|-----------|</span>
+<span class="cm">| Input tokens        | 12,450    |</span>
+<span class="cm">| Output tokens       |  3,120    |</span>
+<span class="cm">| Total tokens        | 15,570    |</span>
+<span class="cm">| Est. % of 5h budget |   ~2.8%   |</span></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ EXTENSION ══ -->
+<section>
+  <div class="section-label">Extensibility Summary</div>
+  <h2>What You Can Extend vs What You Inherit</h2>
+
+  <div class="tbl-wrap" style="margin-top:20px">
+    <table>
+      <thead>
+        <tr>
+          <th>Concern</th>
+          <th>You implement</th>
+          <th>Framework provides</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Domain agent</strong></td>
+          <td>Extend <code>AgentAggregate&lt;TId&gt;</code>, set pipeline</td>
+          <td>All session management, prompt context, question/decision/deliverable tracking</td>
+        </tr>
+        <tr>
+          <td><strong>Agent role</strong></td>
+          <td>Author <code>ROLE.md</code> with identity + mandate + directives</td>
+          <td><code>RoleParser</code> reads it, <code>PromptContext.WithRole()</code> injects it</td>
+        </tr>
+        <tr>
+          <td><strong>Step instructions</strong></td>
+          <td>Pass domain-specific instruction strings to step constructors</td>
+          <td><code>AgentStep</code> base class, <code>DefaultStepCommand</code>, JSON schema enforcement</td>
+        </tr>
+        <tr>
+          <td><strong>Skills</strong></td>
+          <td>Author <code>SKILL.md</code> files with YAML frontmatter + instructions</td>
+          <td><code>FileSkillResolver</code>, catalog + resolve, lazy loading, Pattern A &amp; B selection</td>
+        </tr>
+        <tr>
+          <td><strong>LLM provider</strong></td>
+          <td>Implement <code>IChatClient</code></td>
+          <td>All prompt assembly, JSON parsing, step result type mapping</td>
+        </tr>
+        <tr>
+          <td><strong>Custom handler chain</strong></td>
+          <td>Extend <code>CommandHandlerBase</code>, override <code>SynthesisInstruction</code></td>
+          <td><code>ResolveAndBuildAsync</code>, both skill selection patterns, <code>BuildMessages</code></td>
+        </tr>
+        <tr>
+          <td><strong>Deliverable writing</strong></td>
+          <td>Implement <code>IDeliverableWriter</code></td>
+          <td>Called automatically at end of <code>RunAsync</code> with full run results</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-success" style="margin-top:28px">
+    <div class="callout-icon">🚀</div>
+    <p><strong>Bottom line:</strong> To add a new agent specialised in, say, competitive analysis — you write a ROLE.md, optionally a few SKILL.md files, create a class that extends AgentAggregate, and configure five steps with your domain instructions. The framework handles session hydration, prompt composition, question tracking, gate enforcement, MARK file persistence, and token monitoring automatically.</p>
+  </div>
+</section>
+
+<footer>
+  <p>AgentFramework.Core v2.0 · CODE 5-Phase Relay · PromptContext Refactor · Built with C# &amp; Claude</p>
+  <p style="margin-top:6px; font-size:12px">Architecture overview generated May 2026</p>
+</footer>
+</div><!-- /.page -->
+
+</body>
+</html>

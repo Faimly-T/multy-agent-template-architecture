@@ -12,7 +12,7 @@ tools: [editFiles, createFile]
 
 Execute sequentially. **Read each skill file ONLY when entering that step.**
 
-1. **Define objective for agent** with `rehydrate-context` → Session Objective. Parse `$ARGUMENTS` for agent names.
+1. **Define objective for agent** with `Kickoff-context` → Session Objective. Parse `$ARGUMENTS` for agent names.
 
    **Active session detection**: Before reading child agent MARKs, check for the PjM's own Progress Summary MARK. If it shows an interrupted interview session (completion status = partial/blocked, Open Threads reference unanswered questions):
    - **Resume mode**: Load the prior transcript from the PjM output folder. Identify which questions were already answered and which remain. Set Session Objective to: "Resume interrupted interview — [N] questions remain from [prior session date]." Skip Steps 2–3 (questions are already organized). Jump to Step 4 with the remaining questions only.

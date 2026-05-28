@@ -1,8 +1,10 @@
-using AgentFramework.Core.Agent.Steps;
+using AgentFramework.Core.Agent.Prompts;
 
 namespace AgentFramework.Core.Agent.Ports;
 
 public interface IPipelineFactory
 {
-    Task<StepPipeline> CreatePipelineAsync(Role role, ISkillProvider skillProvider, CancellationToken ct = default);
+    Task<Steps.StepPipeline> CreatePipelineAsync(
+        IStepPromptLayer agentContext,
+        CancellationToken ct = default);
 }

@@ -57,7 +57,9 @@ public class Role
         return sb.ToString();
     }
 
-    public string BuildRolePrompt() => $"""
+    public string BuildRolePrompt
+    {
+        get => $"""
         You are {Identity.Persona}.
         Role: {Identity.Role}
         Authority: {Identity.Authority}
@@ -68,6 +70,7 @@ public class Role
         Directives:
         {string.Join("\n", FactsAndDirectives.Select(d => $"- {d}"))}
         """;
+    }
 }
 
 public class Identity

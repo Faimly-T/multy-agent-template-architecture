@@ -1,12 +1,13 @@
 using System.Text.Json;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
 
 public class OrganizeStep : AgentStep
 {
-    public OrganizeStep(int stepNumber, string name, string instructions, Gate gate)
-        : base(stepNumber, name, "strategic-organize", instructions, gate) { }
+    public OrganizeStep(IStepPromptLayer stepContext, int stepNumber, string instructions, Gate gate)
+        : base(stepContext, stepNumber, "strategic-organize", instructions, gate) { }
 
     public override string JsonResponseSchema => """
         {

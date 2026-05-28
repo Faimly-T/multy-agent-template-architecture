@@ -1,9 +1,8 @@
 using System.Text.RegularExpressions;
-using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 
-namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
+namespace AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain.Handlers;
 
 internal sealed class MarkFileLoaderHandler : ICommandHandler
 {
@@ -11,42 +10,33 @@ internal sealed class MarkFileLoaderHandler : ICommandHandler
 
     public MarkFileLoaderHandler(IMarkFileReader reader) => _reader = reader;
 
-    /// <summary>
-    /// This is the first method to read and understand the previous mark file with the context
-    /// </summary>
-    /// <param name="previousExchange"></param>
-    /// <param name="context"></param>
-    /// <param name="writer"></param>
-    /// <param name="_"></param>
-    /// <param name="ct"></param>
-    /// <returns></returns>
     public async Task<HandlerExchange> ExecuteAiCommandAsync(
-        HandlerExchange? previousExchange,
-        IAgentRunContext? context, 
+        IReadOnlyList<HandlerExchange> context,
+        IAgentRunContext? agentContext,
         ISessionWriter writer,
-        IChatClient _, 
+        IChatClient? _,
         CancellationToken ct)
     {
-        var session = context?.Session;
+        var session = agentContext?.Session;
         if (session is null)
-            return Exchange(previousExchange, "This is the first iteration of the agent. No previous session context exists.");
+            return Exchange(context, "This is the first iteration of the agent. No previous session context exists.");
 
-        var progressMd = await _reader.ReadProgressSummaryAsync(ct);
+        var progressMd = await _reader.ReadProgressSummaryAsync(ct); //TODO: remove this part because we changed to the ckecpoint format which include the progress.
         var distillMd = await _reader.ReadDistillHistoryAsync(ct);
 
         if (progressMd is null && distillMd is null)
-            return Exchange(previousExchange, "This is the first iteration of the agent. No previous session context exists.");
+            return Exchange(context, "This is the first iteration of the agent. No previous session context exists.");
 
         var history = ParseHistory(progressMd, distillMd);
-        session.LoadHistory(history);
+        session.LoadHistory(history); //TODO change to return just a context to define the new objective based on the previous distill session.
 
-        return Exchange(previousExchange, BuildOutput(history));
+        return Exchange(context, BuildOutput(history));
     }
 
-    private HandlerExchange Exchange(HandlerExchange? previous, string output) =>
+    private HandlerExchange Exchange(IReadOnlyList<HandlerExchange> context, string output) =>
         new(GetType().Name,
-            new HandlerContent(previous?.Content.Output ?? "[start]", output),
-            new HandlerMetadata(previous?.Sender, IsLlmCall: false));
+            new HandlerContent(context.LastOutput() ?? "[start]", output),
+            new HandlerMetadata(context.LastOrDefault()?.Sender, IsLlmCall: false));
 
     private static string BuildOutput(SessionHistory history)
     {

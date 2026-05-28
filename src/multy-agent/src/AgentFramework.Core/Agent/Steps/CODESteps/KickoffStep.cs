@@ -1,32 +1,31 @@
 using System.Text.Json;
-using AgentFramework.Core.Agent.Events;
+using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
-using AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate;
-using AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
+using AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain;
+using AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain.Handlers;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
 
-public class RehydrateStep : AgentStep
+public class KickoffStep : AgentStep
 {
     private readonly IMarkFileReader _markFileReader;
-    
-    public RehydrateStep(
-        int stepNumber, 
-        string name, 
-        string instructions, 
-        Gate gate,
-        IMarkFileReader? markFileReader = null)
-        : base(stepNumber, 
-            name, 
-            nameof(RehydrateStep),
-            instructions, 
-            gate)
+    private readonly ISkillResolver? _skillResolver;
+
+    public KickoffStep(
+        IStepPromptLayer   stepContext,
+        int                stepNumber,
+        string             instructions,
+        Gate               gate,
+        IMarkFileReader?   markFileReader = null,
+        ISkillResolver?    skillResolver  = null)
+        : base(stepContext, stepNumber, "Kickoff-context", instructions, gate)
     {
         _markFileReader = markFileReader ?? new NullMarkFileReader();
+        _skillResolver  = skillResolver;
     }
 
-    //TODO: Move this to the cosmos information to avoid hardcoding it in the step
     public override string JsonResponseSchema => """
         {
           "sessionObjective": "string — verb + deliverable + success condition + stakes clause",
@@ -46,25 +45,26 @@ public class RehydrateStep : AgentStep
         IAgentRunContext? context,
         ISessionWriter writer,
         IChatClient chatClient,
-        IDomainEventPublisher? publisher = null,
-        Role? role = null,
         CancellationToken ct = default)
     {
-        var chain = new RehydrateContextChain(
-            new CheckpointValidatorCommand(),
+        var chain = new KickoffContextChain(
+            new CheckpointValidatorCommand(_stepContext),
             new MarkFileLoaderHandler(_markFileReader),
             new IterationEvaluatorHandler(),
-            new QuestionTriageHandler(_markFileReader),
-            new ObjectiveSynthesisHandler(Skill));
+            new QuestionTriageHandler(_markFileReader, _stepContext),
+            new ObjectiveSynthesisHandler(_stepContext, _skillResolver));
 
         var (finalJson, journal) = await chain.RunAsync(context, writer, chatClient, ct);
 
         Journal.Clear();
         Journal.AddRange(journal);
 
-        if (publisher is not null)
-            foreach (var exchange in journal)
-                publisher.Publish(new HandlerExchanged(StepNumber, Name, exchange));
+        // Tracking messages for ConversationMessages — role only, minimal label
+        var trackingMessages = new List<ChatMessage>();
+        if (!string.IsNullOrWhiteSpace(_stepContext.RolePrompt))
+            trackingMessages.Add(new ChatMessage(MessageRole.System, _stepContext.RolePrompt));
+        trackingMessages.Add(new ChatMessage(MessageRole.User, $"## Step {StepNumber}: {Name}"));
+        writer.RecordStepExchange(StepNumber, Name, trackingMessages, finalJson);
 
         using var doc = JsonDocument.Parse(finalJson);
         var gateSatisfied = !doc.RootElement.TryGetProperty("gateSatisfied", out var gs) || gs.GetBoolean();
@@ -86,44 +86,44 @@ public class RehydrateStep : AgentStep
             ? sw.GetString()
             : null;
 
-        var blockers = new List<RehydrateBlocker>();
+        var blockers = new List<KickoffBlocker>();
         if (root.TryGetProperty("blockers", out var bArr))
         {
             foreach (var el in bArr.EnumerateArray())
             {
-                var qId = el.GetProperty("questionId").GetString() ?? string.Empty;
-                var text = el.GetProperty("text").GetString() ?? string.Empty;
+                var qId      = el.GetProperty("questionId").GetString() ?? string.Empty;
+                var text     = el.GetProperty("text").GetString() ?? string.Empty;
                 var severity = el.GetProperty("severity").GetString() ?? "soft";
-                blockers.Add(new RehydrateBlocker(qId, text, severity));
+                blockers.Add(new KickoffBlocker(qId, text, severity));
             }
         }
 
-        return new RehydrateResult(rawOutput, gateSatisfied, objective, narrativeBridge,
+        return new KickoffResult(rawOutput, gateSatisfied, objective, narrativeBridge,
             stalenessWarning, isInitialSession, blockers);
     }
 
     private sealed class NullMarkFileReader : IMarkFileReader
     {
         public Task<string?> ReadProgressSummaryAsync(CancellationToken ct) => Task.FromResult<string?>(null);
-        public Task<string?> ReadQuestionsLogAsync(CancellationToken ct) => Task.FromResult<string?>(null);
-        public Task<string?> ReadDistillHistoryAsync(CancellationToken ct) => Task.FromResult<string?>(null);
+        public Task<string?> ReadQuestionsLogAsync(CancellationToken ct)    => Task.FromResult<string?>(null);
+        public Task<string?> ReadDistillHistoryAsync(CancellationToken ct)  => Task.FromResult<string?>(null);
     }
 }
 
 
-public record RehydrateBlocker(string QuestionId, string Text, string Severity);
+public record KickoffBlocker(string QuestionId, string Text, string Severity);
 
-public record RehydrateResult(
+public record KickoffResult(
     string Output,
     bool GateSatisfied,
     string SessionObjective,
     string NarrativeBridge = "",
     string? StalenessWarning = null,
     bool IsInitialSession = false,
-    IReadOnlyList<RehydrateBlocker>? Blockers = null) : StepResult(Output, GateSatisfied)
+    IReadOnlyList<KickoffBlocker>? Blockers = null) : StepResult(Output, GateSatisfied)
 {
     public override void ApplyTo(ISessionWriter writer)
     {
-        writer.UpdateObjective(SessionObjective);
+        writer.BeginIteration(SessionObjective);
     }
 }

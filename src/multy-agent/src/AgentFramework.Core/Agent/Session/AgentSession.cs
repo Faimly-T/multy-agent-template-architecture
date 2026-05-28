@@ -14,6 +14,9 @@ public class AgentSession
 
     public SessionHistory? History { get; private set; }
 
+    public string? UserIntent { get; private set; }
+    internal void SetUserIntent(string intent) => UserIntent = intent;
+
     public AgentSession(string projectId, SessionMarkFilePaths markFilePaths)
     {
         ProjectId = projectId;

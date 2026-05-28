@@ -1,17 +1,17 @@
-using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 
-namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
+namespace AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain.Handlers;
 
+//TODO: Evaluate if I should remove this class because this overlaps with the first CheckpointValidatorCommand
 internal sealed class IterationEvaluatorHandler : ICommandHandler
 {
     public Task<HandlerExchange> ExecuteAiCommandAsync(
-        HandlerExchange? previousExchange,
-        IAgentRunContext? context, ISessionWriter writer,
-        IChatClient _, CancellationToken ct)
+        IReadOnlyList<HandlerExchange> context,
+        IAgentRunContext? agentContext, ISessionWriter writer,
+        IChatClient? _, CancellationToken ct)
     {
-        var session = context?.Session;
+        var session = agentContext?.Session;
         var history = session?.History;
 
         string output;
@@ -39,11 +39,9 @@ internal sealed class IterationEvaluatorHandler : ICommandHandler
             output = string.Join('\n', lines);
         }
 
-        return Task.FromResult(Exchange(previousExchange, output));
+        return Task.FromResult(new HandlerExchange(
+            GetType().Name,
+            new HandlerContent(context.LastOutput() ?? "[start]", output),
+            new HandlerMetadata(context.LastOrDefault()?.Sender, IsLlmCall: false)));
     }
-
-    private HandlerExchange Exchange(HandlerExchange? previous, string output) =>
-        new(GetType().Name,
-            new HandlerContent(previous?.Content.Output ?? "[start]", output),
-            new HandlerMetadata(previous?.Sender, IsLlmCall: false));
 }

@@ -12,7 +12,7 @@ tools: [editFiles, createFile]
 
 Execute sequentially. **Read each skill file ONLY when entering that step.**
 
-1. **Define objective for agent** with `rehydrate-context` → Session Objective. Parse product description.
+1. **Define objective for agent** with `Kickoff-context` → Session Objective. Parse product description.
    Gate: Objective confirmed
 
 2. **Generate unfiltered Island Backlog** with `autonomous-capture` — hunt for: user types (direct + indirect) · goals & motivations · pain points · behavioral patterns · context of use (where/when/device) · emotional states · anti-users · stakeholders · accessibility signals.

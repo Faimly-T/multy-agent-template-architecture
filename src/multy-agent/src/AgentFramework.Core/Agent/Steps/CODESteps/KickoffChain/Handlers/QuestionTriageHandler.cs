@@ -1,18 +1,17 @@
 using System.Text.Json;
-using AgentFramework.Core.Agent.Conversation;
-using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 
-namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate.Handlers;
+namespace AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain.Handlers;
 
-internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHandler
+internal sealed class QuestionTriageHandler(
+    IMarkFileReader   reader,
+    IStepPromptLayer? stepCtx = null)
+    : CommandHandlerBase(stepCtx, "You are triaging open questions from a prior agent session. " +
+                                  "Based on the iteration context provided, classify each question. " +
+                                  "Respond with valid JSON only.")
 {
-    private const string SystemPrompt =
-        "You are triaging open questions from a prior agent session. " +
-        "Based on the iteration context provided, classify each question. " +
-        "Respond with valid JSON only.";
-
     private const string TriageSchema = """
         {
           "triaged": [
@@ -22,27 +21,28 @@ internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHa
         }
         """;
 
-    public async Task<HandlerExchange> ExecuteAiCommandAsync(
-        HandlerExchange? previousExchange,
-        IAgentRunContext? context, ISessionWriter writer,
-        IChatClient chatClient, CancellationToken ct)
+    public override async Task<HandlerExchange> ExecuteAiCommandAsync(
+        IReadOnlyList<HandlerExchange> context,
+        IAgentRunContext? agentContext, ISessionWriter writer,
+        IChatClient? chatClient, CancellationToken ct)
     {
-        if (context is null)
-            return Exchange(previousExchange, "No context — skipping question triage.", isLlmCall: false);
+        if (agentContext is null)
+            return Exchange(context, "No context — skipping question triage.", isLlmCall: false);
 
         var questionsMd = await reader.ReadQuestionsLogAsync(ct);
         if (questionsMd is not null)
             RestoreQuestionsFromMark(questionsMd, writer);
 
-        var openQuestions = context.Questions.Where(q => q.Status == QuestionStatus.Open).ToList();
+        var openQuestions = agentContext.Questions.Where(q => q.Status == QuestionStatus.Open).ToList();
 
         if (openQuestions.Count == 0)
-            return Exchange(previousExchange, "No open questions — proceeding without question triage.", isLlmCall: false);
+            return Exchange(context, "No open questions — proceeding without question triage.", isLlmCall: false);
 
         var questionMap = openQuestions.ToDictionary(q => q.Id, q => q.Text);
-        var messages = BuildMessages(previousExchange?.Content.Output ?? string.Empty, openQuestions);
+        var userContent = BuildTriageUserContent(context.LastOutput() ?? string.Empty, openQuestions);
+        var messages = BuildPrompt(userContent);
 
-        var triage = await chatClient.SendHandlerAsync(
+        var triage = await chatClient!.SendHandlerAsync(
             messages,
             TriageSchema,
             root => ParseTriageResponse(root, questionMap),
@@ -50,8 +50,8 @@ internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHa
 
         ApplyTriage(triage, writer);
 
-        var resolved = triage.Triaged.Count(q => q.Status == "resolved");
-        var obsolete = triage.Triaged.Count(q => q.Status == "obsolete");
+        var resolved  = triage.Triaged.Count(q => q.Status == "resolved");
+        var obsolete  = triage.Triaged.Count(q => q.Status == "obsolete");
         var stillOpen = triage.Triaged.Count(q => q.Status == "still_open");
 
         var blockerLines = triage.Blockers.Count > 0
@@ -59,21 +59,21 @@ internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHa
             : string.Empty;
 
         var output = $"Triage complete: {resolved} resolved, {obsolete} obsolete, {stillOpen} still open.{blockerLines}";
-        return Exchange(previousExchange, output, isLlmCall: true);
+        return Exchange(context, output, isLlmCall: true);
     }
 
-    private HandlerExchange Exchange(HandlerExchange? previous, string output, bool isLlmCall) =>
+    private HandlerExchange Exchange(IReadOnlyList<HandlerExchange> context, string output, bool isLlmCall) =>
         new(GetType().Name,
-            new HandlerContent(previous?.Content.Output ?? "[start]", output),
-            new HandlerMetadata(previous?.Sender, IsLlmCall: isLlmCall));
+            new HandlerContent(context.LastOutput() ?? "[start]", output),
+            new HandlerMetadata(context.LastOrDefault()?.Sender, IsLlmCall: isLlmCall));
 
-    private static IReadOnlyList<ChatMessage> BuildMessages(
+    private static string BuildTriageUserContent(
         string iterationContext, IReadOnlyList<Question> openQuestions)
     {
         var questionLines = string.Join('\n',
             openQuestions.Select(q => $"  - {q.Id}: {q.Text}"));
 
-        var userContent = $"""
+        return $"""
             {iterationContext}
 
             Open questions requiring triage:
@@ -84,12 +84,6 @@ internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHa
               - If no longer relevant → status: "obsolete"
               - Otherwise → status: "still_open", classify severity as "hard" or "soft"
             """;
-
-        return
-        [
-            new ChatMessage(MessageRole.System, SystemPrompt),
-            new ChatMessage(MessageRole.User, userContent)
-        ];
     }
 
     private static void RestoreQuestionsFromMark(string questionsMd, ISessionWriter writer)
@@ -119,13 +113,11 @@ internal sealed class QuestionTriageHandler(IMarkFileReader reader) : ICommandHa
         var triaged = new List<TriagedQuestion>();
         foreach (var el in arr.EnumerateArray())
         {
-            var id = el.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "";
-            var text = questionMap.TryGetValue(id, out var t) ? t : "";
-            var status = el.TryGetProperty("status", out var stEl) ? stEl.GetString() ?? "still_open" : "still_open";
-            var answer = el.TryGetProperty("answer", out var ansEl) && ansEl.ValueKind != JsonValueKind.Null
-                ? ansEl.GetString() : null;
-            var severity = el.TryGetProperty("blockerSeverity", out var sevEl) && sevEl.ValueKind != JsonValueKind.Null
-                ? sevEl.GetString() : null;
+            var id       = el.TryGetProperty("id",             out var idEl)  ? idEl.GetString()  ?? "" : "";
+            var text     = questionMap.TryGetValue(id, out var t) ? t : "";
+            var status   = el.TryGetProperty("status",         out var stEl)  ? stEl.GetString()  ?? "still_open" : "still_open";
+            var answer   = el.TryGetProperty("answer",         out var ansEl) && ansEl.ValueKind != JsonValueKind.Null ? ansEl.GetString() : null;
+            var severity = el.TryGetProperty("blockerSeverity",out var sevEl) && sevEl.ValueKind != JsonValueKind.Null ? sevEl.GetString() : null;
 
             triaged.Add(new TriagedQuestion(id, text, status, answer, severity));
         }

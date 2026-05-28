@@ -1,4 +1,4 @@
-namespace AgentFramework.Core.Agent.Steps.CODESteps.Rehydrate;
+namespace AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain;
 
 internal static class MarkSectionParser
 {

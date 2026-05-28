@@ -45,7 +45,29 @@
       "PowerShell($env:PATH = \"$env:PATH;C:\\\\Program Files\\\\dotnet\"; Set-Location \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\"; dotnet test --filter \"Category!=Integration\" 2>&1 | Select-Object -Last 15)",
       "PowerShell($env:PATH = \"$env:PATH;C:\\\\Program Files\\\\dotnet\"; Set-Location \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\"; dotnet test --filter \"Category!=Integration\" 2>&1 | Select-Object -Last 10)",
       "PowerShell($env:PATH = \"$env:PATH;C:\\\\Program Files\\\\dotnet\"; Set-Location \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\"; dotnet test --filter \"Category!=Integration\" 2>&1 | Select-Object -Last 5)",
-      "PowerShell(Stop-Process -Id 60360 -Force -ErrorAction SilentlyContinue; $env:PATH = \"$env:PATH;C:\\\\Program Files\\\\dotnet\"; Set-Location \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\"; dotnet test --filter \"Category!=Integration\" 2>&1 | Select-Object -Last 5)"
+      "PowerShell(Stop-Process -Id 60360 -Force -ErrorAction SilentlyContinue; $env:PATH = \"$env:PATH;C:\\\\Program Files\\\\dotnet\"; Set-Location \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\"; dotnet test --filter \"Category!=Integration\" 2>&1 | Select-Object -Last 5)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Steps\\\\CODESteps\\\\KickoffChain\\\\\" -Force 2>$null | ForEach-Object { $_.FullName })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Steps\\\\CODESteps\\\\KickoffChain\\\\Handlers\\\\\" -Force 2>$null | ForEach-Object { $_.FullName })",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"src/multy-agent/src/AgentFramework.Core\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(Remove-Item \"src/multy-agent/src/AgentFramework.Core/Agent/Events/StepStarted.cs\", \"src/multy-agent/src/AgentFramework.Core/Agent/Events/StepCompleted.cs\", \"src/multy-agent/src/AgentFramework.Core/Agent/Events/StepGateFailed.cs\", \"src/multy-agent/src/AgentFramework.Core/Agent/Events/QuestionsUpdated.cs\" -Force)",
+      "Bash(Remove-Item -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\obj\\\\Debug\\\\net10.0\\\\AgentFramework.Core.csproj.CoreCompileInputs.cache\" -Force -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Done\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Ports\\\\IContextWindowStrategy.cs\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Conversation\\\\SelectiveContextStrategy.cs\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Ports\\\\IStepMessageBuilder.cs\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Domain\\\\UxAgent\\\\UxStepMessageBuilder.cs\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Conversation\\\\ConversationHistory.cs\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Ports\\\\ISkillProvider.cs\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Infrastructure\\\\Skills\\\\FileSkillProvider.cs\" -Force)",
+      "Bash(Write-Host \"Deleted\")",
+      "PowerShell(\"Deleted\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Prompts\\\\ICommandPromptLayer.cs\")"
     ]
   }
 }

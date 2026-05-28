@@ -1,12 +1,13 @@
 using System.Text.Json;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
 
 public class DistillStep : AgentStep
 {
-    public DistillStep(int stepNumber, string name, string instructions, Gate gate)
-        : base(stepNumber, name, "expert-distill", instructions, gate) { }
+    public DistillStep(IStepPromptLayer stepContext, int stepNumber, string instructions, Gate gate)
+        : base(stepContext, stepNumber, "expert-distill", instructions, gate) { }
 
     public override string JsonResponseSchema => """
         {

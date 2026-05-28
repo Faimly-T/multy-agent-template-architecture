@@ -1,12 +1,13 @@
 using System.Text.Json;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps;
 
 public class CaptureStep : AgentStep
 {
-    public CaptureStep(int stepNumber, string name, string instructions, Gate gate)
-        : base(stepNumber, name, "autonomous-capture", instructions, gate) { }
+    public CaptureStep(IStepPromptLayer stepContext, int stepNumber, string instructions, Gate gate)
+        : base(stepContext, stepNumber, "autonomous-capture", instructions, gate) { }
 
     public override string JsonResponseSchema => """
         {

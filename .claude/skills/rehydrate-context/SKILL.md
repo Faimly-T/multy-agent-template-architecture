@@ -1,5 +1,5 @@
 ---
-name: rehydrate-context
+name: Kickoff-context
 description: Define objective for agent and reconstruct session from MARK files.
 ---
 

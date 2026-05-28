@@ -17,20 +17,18 @@ public class SessionMappingTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", TestMarkFilePaths);
     }
 
-    // --- Step 1: Rehydrate → maps Session Objective ---
+    // --- Step 1: Kickoff → maps Session Objective ---
 
     [Fact]
-    public async Task Step1_RehydrateResult_MapsSessionObjective()
+    public async Task Step1_KickoffResult_MapsSessionObjective()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "placeholder");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
 
         Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
     }
@@ -41,12 +39,10 @@ public class SessionMappingTests
     public async Task Step2_CaptureResult_MapsIslandsToSession()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
+        await agent.ExecuteNextStepAsync(client);
 
         Assert.Equal(3, agent.Session!.Islands.Count);
         Assert.Equal("ISL-001", agent.Session.Islands[0].Id);
@@ -58,12 +54,10 @@ public class SessionMappingTests
     public async Task Step2_CaptureResult_MapsIslandRelations()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
+        await agent.ExecuteNextStepAsync(client);
 
         Assert.Null(agent.Session!.Islands[0].RelatesToIslandId);
         Assert.Equal("ISL-001", agent.Session.Islands[2].RelatesToIslandId);
@@ -75,13 +69,11 @@ public class SessionMappingTests
     public async Task Step3_OrganizeResult_UpdatesIslandStatuses()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client); // Step 1
-        await agent.ExecuteNextStepAsync(builder, client); // Step 2
-        await agent.ExecuteNextStepAsync(builder, client); // Step 3
+        await agent.ExecuteNextStepAsync(client); // Step 1
+        await agent.ExecuteNextStepAsync(client); // Step 2
+        await agent.ExecuteNextStepAsync(client); // Step 3
 
         Assert.Equal(IslandStatus.Organized, agent.Session!.Islands[0].Status);
         Assert.Equal(IslandStatus.Organized, agent.Session.Islands[1].Status);
@@ -92,13 +84,11 @@ public class SessionMappingTests
     public async Task Step3_OrganizeResult_RecordsDecisions()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
-        await agent.ExecuteNextStepAsync(builder, client);
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
+        await agent.ExecuteNextStepAsync(client);
+        await agent.ExecuteNextStepAsync(client);
 
         Assert.Single(agent.Decisions);
         Assert.Equal("DEC-001", agent.Decisions[0].Id);
@@ -111,14 +101,12 @@ public class SessionMappingTests
     public async Task Step4_DistillResult_MapsDeliverablesAndIslandStatus()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client); // 1
-        await agent.ExecuteNextStepAsync(builder, client); // 2
-        await agent.ExecuteNextStepAsync(builder, client); // 3
-        await agent.ExecuteNextStepAsync(builder, client); // 4
+        await agent.ExecuteNextStepAsync(client); // 1
+        await agent.ExecuteNextStepAsync(client); // 2
+        await agent.ExecuteNextStepAsync(client); // 3
+        await agent.ExecuteNextStepAsync(client); // 4
 
         Assert.Equal(IslandStatus.Distilled, agent.Session!.Islands[0].Status);
         Assert.Equal(IslandStatus.Distilled, agent.Session.Islands[1].Status);
@@ -134,11 +122,9 @@ public class SessionMappingTests
     public async Task Step5_ExpressResult_MapsTokenConsumption()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "objective");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteAllStepsAsync(builder, client);
+        await agent.ExecuteAllStepsAsync(client);
 
         Assert.True(agent.IsCompleted);
         Assert.Equal(2000, agent.Session!.CurrentCheckpoint!.TokensConsumption.InputTokens);
@@ -152,11 +138,9 @@ public class SessionMappingTests
     public async Task FullPipeline_EmptySession_MapsAllSteps()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-project", TestMarkFilePaths, "placeholder");
-        var builder = new UxStepMessageBuilder();
         var client = new PhaseAwareChatClient();
 
-        var results = await agent.ExecuteAllStepsAsync(builder, client);
+        var results = await agent.ExecuteAllStepsAsync(client);
 
         Assert.Equal(5, results.Count);
         Assert.True(agent.IsCompleted);
@@ -169,17 +153,18 @@ public class SessionMappingTests
     }
 
     [Fact]
-    public async Task NoSession_DoesNotThrow_WhenApplySkipped()
+    public async Task BeforeKickoff_CheckpointIsNull()
     {
         var agent = CreateAgent();
-        // No OpenSession call
-        var builder = new UxStepMessageBuilder();
-        var client = new PhaseAwareChatClient();
 
-        var result = await agent.ExecuteNextStepAsync(builder, client);
+        Assert.NotNull(agent.Session);
+        Assert.Null(agent.Session.CurrentCheckpoint);
+
+        var client = new PhaseAwareChatClient();
+        var result = await agent.ExecuteNextStepAsync(client);
 
         Assert.True(result.GateSatisfied);
-        Assert.Null(agent.Session);
+        Assert.NotNull(agent.Session.CurrentCheckpoint);
     }
 
     // --- Fake chat client ---
@@ -200,7 +185,7 @@ public class SessionMappingTests
         {
             StepResult result = step.StepNumber switch
             {
-                1 => new RehydrateResult(
+                1 => new KickoffResult(
                     Output: "Objective defined",
                     GateSatisfied: true,
                     SessionObjective: "Build personas for a college athletic recruiting platform"),

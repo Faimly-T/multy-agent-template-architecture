@@ -12,6 +12,13 @@ public static class SkillParser
         return new Skill(name, description, instructions);
     }
 
+    public static SkillSummary ParseSummaryFromMarkdown(string markdown)
+    {
+        var name = ExtractFrontmatter(markdown, "name");
+        var description = ExtractFrontmatter(markdown, "description");
+        return new SkillSummary(name, description);
+    }
+
     private static string ExtractFrontmatter(string md, string field)
     {
         var match = Regex.Match(md, $@"^{field}:\s*(.+)$", RegexOptions.Multiline);

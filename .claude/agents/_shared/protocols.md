@@ -10,7 +10,7 @@ Every agent session follows this sequence. No phase is skipped. No phase is reor
 
 | Step | Skill | Mode | Gate |
 |------|-------|------|------|
-| 1. Re-Hydrate | `rehydrate-context` | Entry | Session Objective confirmed |
+| 1. Re-Hydrate | `Kickoff-context` | Entry | Session Objective confirmed |
 | 2. Capture | `autonomous-capture` | DIVERGENT | Island Backlog produced |
 | 3. Organize | `strategic-organize` | CONVERGENT | Execution Roadmap sequenced |
 | 4. Distill | `expert-distill` | CONVERGENT | All islands processed |

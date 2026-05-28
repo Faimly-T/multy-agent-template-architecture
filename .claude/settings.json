@@ -59,7 +59,7 @@
     }
   },
   "skills": {
-    "rehydrate-context": "skills/rehydrate-context/SKILL.md",
+    "Kickoff-context": "skills/Kickoff-context/SKILL.md",
     "autonomous-capture": "skills/autonomous-capture/SKILL.md",
     "strategic-organize": "skills/strategic-organize/SKILL.md",
     "expert-distill": "skills/expert-distill/SKILL.md",

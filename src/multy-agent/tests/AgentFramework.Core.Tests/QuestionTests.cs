@@ -1,8 +1,8 @@
 using System.Text.Json;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
-using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Core.Agent.Steps.CODESteps;
@@ -18,7 +18,7 @@ public class QuestionTests
     private static UxPersona CreateAgent()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", TestMarkFilePaths);
     }
 
     // ==========================================================
@@ -119,7 +119,6 @@ public class QuestionTests
     public void RaiseQuestion_AddsOpenQuestion()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
 
         Assert.Single(agent.Questions);
@@ -131,7 +130,6 @@ public class QuestionTests
     public void FindQuestion_ReturnsNullForMissing()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         Assert.Null(agent.FindQuestion("MISSING"));
     }
 
@@ -139,7 +137,6 @@ public class QuestionTests
     public void ApplyQuestionReview_TransitionsToReviewed()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
         var q = agent.FindQuestion("UX-Q001")!;
         q.SetAnswer("Football only", "PjM");
@@ -153,7 +150,6 @@ public class QuestionTests
     public void ApplyQuestionReview_TransitionsToObsolete()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("UX-Q001", "Old question", "express-relay");
 
         agent.ApplyQuestionReview("UX-Q001", QuestionStatus.Obsolete);
@@ -169,7 +165,6 @@ public class QuestionTests
     public void ApplyExpress_RaisesNewQuestions()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         var result = new ExpressResult(
             Output: "done",
             GateSatisfied: true,
@@ -188,7 +183,6 @@ public class QuestionTests
     public void ApplyExpress_ReviewsAnsweredQuestions()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
         agent.FindQuestion("UX-Q001")!.SetAnswer("Football only", "PjM");
 
@@ -208,7 +202,6 @@ public class QuestionTests
     public void ApplyExpress_MarksQuestionsObsolete()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("UX-Q001", "Old question", "express-relay");
 
         var result = new ExpressResult(
@@ -227,7 +220,7 @@ public class QuestionTests
     public void ApplyExpress_UpdatesTokensAndQuestions()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
+        ((ISessionWriter)agent).BeginIteration("objective");
         var result = new ExpressResult(
             Output: "done",
             GateSatisfied: true,
@@ -259,7 +252,6 @@ public class QuestionTests
     public void GetQuestions_ReturnsAllQuestions()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
 
@@ -270,7 +262,6 @@ public class QuestionTests
     public void GetQuestions_FiltersByStatus()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
         agent.FindQuestion("Q-001")!.SetAnswer("A1", "PjM");
@@ -283,7 +274,6 @@ public class QuestionTests
     public void GetOpenQuestions_ReturnsOnlyOpen()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
         agent.FindQuestion("Q-001")!.SetAnswer("A1", "PjM");
@@ -297,7 +287,6 @@ public class QuestionTests
     public void GetPendingReviewQuestions_ReturnsAnswered()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.FindQuestion("Q-001")!.SetAnswer("A1", "PjM");
 
@@ -314,7 +303,6 @@ public class QuestionTests
     public void SupplyAnswers_TransitionsOpenToAnswered()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
 
@@ -338,7 +326,6 @@ public class QuestionTests
     public void SupplyAnswers_ThrowsForMissingQuestion()
     {
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
         Assert.Throws<InvalidOperationException>(() =>
             agent.SupplyAnswers([("MISSING", "Answer", "PjM")]));
@@ -351,7 +338,7 @@ public class QuestionTests
     [Fact]
     public void ExpressStep_ParseResult_ExtractsQuestions()
     {
-        var step = new ExpressStep(5, "Express", "instructions", new Gate("gate"));
+        var step = new ExpressStep(PromptContext.Empty, 5, "instructions", new Gate("gate"));
         var json = """
             {
               "inputTokens": 1000,
@@ -381,7 +368,7 @@ public class QuestionTests
     [Fact]
     public void ExpressStep_ParseResult_HandlesNoQuestions()
     {
-        var step = new ExpressStep(5, "Express", "instructions", new Gate("gate"));
+        var step = new ExpressStep(PromptContext.Empty, 5, "instructions", new Gate("gate"));
         var json = """
             {
               "inputTokens": 500,
@@ -403,9 +390,8 @@ public class QuestionTests
     [Fact]
     public void ExpressStep_BuildContext_IncludesAnsweredQuestions()
     {
-        var step = new ExpressStep(5, "Express", "instructions", new Gate("gate"));
+        var step = new ExpressStep(PromptContext.Empty, 5, "instructions", new Gate("gate"));
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
         agent.RaiseQuestion("UX-Q001", "What scope?", "express");
         agent.FindQuestion("UX-Q001")!.SetAnswer("Football only", "PjM Interview");
 
@@ -420,9 +406,8 @@ public class QuestionTests
     [Fact]
     public void ExpressStep_BuildContext_NoQuestions_ShowsNoQuestionsLogged()
     {
-        var step = new ExpressStep(5, "Express", "instructions", new Gate("gate"));
+        var step = new ExpressStep(PromptContext.Empty, 5, "instructions", new Gate("gate"));
         var agent = CreateAgent();
-        agent.OpenSession("test-proj", TestMarkFilePaths, "objective");
 
         var context = step.BuildContext(agent);
 
@@ -430,19 +415,17 @@ public class QuestionTests
     }
 
     // ==========================================================
-    // Pipeline — Express raises questions → SupplyAnswers → Rehydrate includes answers
+    // Pipeline — Express raises questions → SupplyAnswers → Kickoffludes answers
     // ==========================================================
 
     [Fact]
     public async Task Pipeline_QuestionsFlowBetweenSessions()
     {
         var agent = CreateAgent();
-        var builder = new UxStepMessageBuilder();
         var client = new QuestionAwareChatClient();
 
         // Session 1: Express raises questions
-        agent.OpenSession("test-proj", TestMarkFilePaths, "Build personas");
-        var results = await agent.ExecuteAllStepsAsync(builder, client);
+        var results = await agent.ExecuteAllStepsAsync(client);
 
         Assert.Equal(5, results.Count);
         Assert.Equal(2, agent.GetOpenQuestions().Count);
@@ -455,22 +438,6 @@ public class QuestionTests
 
         Assert.Equal(2, agent.GetPendingReviewQuestions().Count);
         Assert.Empty(agent.GetOpenQuestions());
-    }
-
-    [Fact]
-    public async Task Pipeline_ExpressStep_RaisesQuestionsUpdatedEvent()
-    {
-        var agent = CreateAgent();
-        var builder = new UxStepMessageBuilder();
-        var client = new QuestionAwareChatClient();
-
-        agent.OpenSession("test-proj", TestMarkFilePaths, "Build personas");
-        await agent.ExecuteAllStepsAsync(builder, client);
-
-        var questionsEvent = agent.DomainEvents.OfType<QuestionsUpdated>().SingleOrDefault();
-        Assert.NotNull(questionsEvent);
-        Assert.Equal(2, questionsEvent.NewQuestions.Count);
-        Assert.Equal(0, questionsEvent.ReviewedCount);
     }
 
     // --- Fake chat client that returns questions in Express ---
@@ -491,7 +458,7 @@ public class QuestionTests
         {
             StepResult result = step.StepNumber switch
             {
-                1 => new RehydrateResult("Objective defined", true, "Build personas"),
+                1 => new KickoffResult("Objective defined", true, "Build personas"),
                 2 => new CaptureResult("Captured", true, [
                     new CapturedIsland("ISL-001", IslandType.UserType, "Student athlete", "product"),
                     new CapturedIsland("ISL-002", IslandType.Stakeholder, "Coach", "product"),

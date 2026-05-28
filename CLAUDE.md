@@ -14,7 +14,7 @@ Every agent session runs these 5 phases in order. No phase is skipped or reorder
 
 | Step | Skill | Mode | What Happens |
 |------|-------|------|--------------|
-| 1. Re-Hydrate | `rehydrate-context` | Entry | Read MARK files → set Session Objective → user confirms |
+| 1. Re-Hydrate | `Kickoff-context` | Entry | Read MARK files → set Session Objective → user confirms |
 | 2. Capture | `autonomous-capture` | DIVERGENT | Generate unfiltered Island Backlog (no judging, quantity over quality) |
 | 3. Organize | `strategic-organize` | CONVERGENT | Deduplicate → cluster → sequence → Execution Roadmap |
 | 4. Distill | `expert-distill` | CONVERGENT | Process each island → concrete Result or formal Concern |
@@ -84,7 +84,7 @@ Skills are lazy-loaded — agents read each skill file ONLY when entering that s
 
 | Skill | File | Trigger Phrase (in agent Steps) |
 |-------|------|---------------------------------|
-| `rehydrate-context` | `.claude/skills/rehydrate-context/SKILL.md` | "Define objective for agent" |
+| `Kickoff-context` | `.claude/skills/Kickoff-context/SKILL.md` | "Define objective for agent" |
 | `autonomous-capture` | `.claude/skills/autonomous-capture/SKILL.md` | "Generate unfiltered Island Backlog" |
 | `strategic-organize` | `.claude/skills/strategic-organize/SKILL.md` | "Map, group, and sequence the Island Backlog" |
 | `expert-distill` | `.claude/skills/expert-distill/SKILL.md` | "Distill each island into a concrete result" |
@@ -115,7 +115,7 @@ Every CODE-upgraded agent follows this structure in `AGENT.md`:
 **Load role**: Read agent's configured role file (from .claude/settings.json)
 
 ### Steps
-1. **Define objective for agent** with `rehydrate-context` → [domain input]. Gate: ...
+1. **Define objective for agent** with `Kickoff-context` → [domain input]. Gate: ...
 2. **Generate unfiltered Island Backlog** with `autonomous-capture` — hunt for: [domain targets]. Gate: ...
 3. **Map, group, and sequence the Island Backlog** with `strategic-organize` — [clustering]. Gate: ...
 4. **Distill each island into a concrete result** with `expert-distill` — produce [artifacts]. Gate: ...
@@ -245,7 +245,7 @@ CLAUDE.md                          # ← You are here. Framework reference.
       AGENT-TEMPLATE.md            # Template for new CODE agents
       ORCHESTRATOR-TEMPLATE.md     # Template for new orchestrator agents
   skills/
-    rehydrate-context/SKILL.md     # Step 1: Session boot
+    Kickoff-context/SKILL.md     # Step 1: Session boot
     autonomous-capture/SKILL.md    # Step 2: Divergent capture
     strategic-organize/SKILL.md    # Step 3: Convergent organizing
     expert-distill/SKILL.md        # Step 4: Produce results

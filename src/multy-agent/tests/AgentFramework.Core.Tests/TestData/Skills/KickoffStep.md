@@ -1,5 +1,5 @@
 ---
-name: RehydrateStep
+name: KickoffStep
 description: Define objective for agent and reconstruct session from prior state.
 ---
 

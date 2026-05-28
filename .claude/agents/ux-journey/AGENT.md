@@ -12,7 +12,7 @@ tools: [editFiles, createFile]
 
 Execute sequentially. **Read each skill file ONLY when entering that step.**
 
-1. **Define objective for agent** with `rehydrate-context` → Session Objective. **Validate personas exist**: read ux-persona's configured output folder (from `.claude/settings.json`) and confirm ≥1 persona card is present. If folder is empty or missing → HALT with error: "No personas found. Run `ux-persona-architect` first." Load persona Quick Profile + Goals + Pains from each card.
+1. **Define objective for agent** with `Kickoff-context` → Session Objective. **Validate personas exist**: read ux-persona's configured output folder (from `.claude/settings.json`) and confirm ≥1 persona card is present. If folder is empty or missing → HALT with error: "No personas found. Run `ux-persona-architect` first." Load persona Quick Profile + Goals + Pains from each card.
    Gate: Objective confirmed + ≥1 persona validated and loaded
 
 2. **Generate unfiltered Island Backlog** with `autonomous-capture` — hunt for: journey stages (awareness → advocacy) · touchpoints per stage · channels (app, web, email, human) · user actions · emotional state shifts · pain moments & friction · moments of truth · drop-off risks · transition triggers · backstage processes · cross-persona divergence points.

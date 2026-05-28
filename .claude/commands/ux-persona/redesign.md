@@ -5,7 +5,7 @@ Execute the full CODE 5-Phase Relay (Steps 1–5) with a redesign lens. Prior pe
 
 1. Read the `ux-persona` agent definition (resolve from `.claude/settings.json`).
 2. Load the agent's role file — adopt Identity, Mandate, and Facts & Directives.
-3. Execute Step 1 (Rehydrate) — read existing MARK files. Note: scope has changed. The session objective should reflect the redesign.
+3. Execute Step 1 (Kickoff) — read existing MARK files. Note: scope has changed. The session objective should reflect the redesign.
 4. Execute Steps 2–5. Load existing persona cards from `outputs/personas` as a **baseline reference** — assess which personas survive the scope change, which need redesign, and which are new. Do not assume prior personas are still valid.
 5. Write redesigned Persona Cards to the agent's configured output folder. Use versioned filenames if preserving originals is warranted.
 6. Update MARK files.
