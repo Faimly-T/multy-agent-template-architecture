@@ -67,7 +67,9 @@
       "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Infrastructure\\\\Skills\\\\FileSkillProvider.cs\" -Force)",
       "Bash(Write-Host \"Deleted\")",
       "PowerShell(\"Deleted\")",
-      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Prompts\\\\ICommandPromptLayer.cs\")"
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Prompts\\\\ICommandPromptLayer.cs\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Ports\\\\IPipelineFactory.cs\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Role.cs\")"
     ]
   }
 }

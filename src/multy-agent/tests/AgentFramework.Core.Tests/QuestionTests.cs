@@ -15,10 +15,12 @@ public class QuestionTests
     private const string TestDataPath = "TestData/UxPersonaRole.md";
     private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", TestMarkFilePaths);
+        var role = RoleParser.ParseFromMarkdown(markdown);
+        var config = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     // ==========================================================
@@ -116,9 +118,9 @@ public class QuestionTests
     // ==========================================================
 
     [Fact]
-    public void RaiseQuestion_AddsOpenQuestion()
+    public async Task RaiseQuestion_AddsOpenQuestion()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
 
         Assert.Single(agent.Questions);
@@ -127,16 +129,16 @@ public class QuestionTests
     }
 
     [Fact]
-    public void FindQuestion_ReturnsNullForMissing()
+    public async Task FindQuestion_ReturnsNullForMissing()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Null(agent.FindQuestion("MISSING"));
     }
 
     [Fact]
-    public void ApplyQuestionReview_TransitionsToReviewed()
+    public async Task ApplyQuestionReview_TransitionsToReviewed()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
         var q = agent.FindQuestion("UX-Q001")!;
         q.SetAnswer("Football only", "PjM");
@@ -147,9 +149,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void ApplyQuestionReview_TransitionsToObsolete()
+    public async Task ApplyQuestionReview_TransitionsToObsolete()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q001", "Old question", "express-relay");
 
         agent.ApplyQuestionReview("UX-Q001", QuestionStatus.Obsolete);
@@ -162,9 +164,9 @@ public class QuestionTests
     // ==========================================================
 
     [Fact]
-    public void ApplyExpress_RaisesNewQuestions()
+    public async Task ApplyExpress_RaisesNewQuestions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var result = new ExpressResult(
             Output: "done",
             GateSatisfied: true,
@@ -180,9 +182,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void ApplyExpress_ReviewsAnsweredQuestions()
+    public async Task ApplyExpress_ReviewsAnsweredQuestions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q001", "What scope?", "express-relay");
         agent.FindQuestion("UX-Q001")!.SetAnswer("Football only", "PjM");
 
@@ -199,9 +201,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void ApplyExpress_MarksQuestionsObsolete()
+    public async Task ApplyExpress_MarksQuestionsObsolete()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q001", "Old question", "express-relay");
 
         var result = new ExpressResult(
@@ -217,9 +219,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void ApplyExpress_UpdatesTokensAndQuestions()
+    public async Task ApplyExpress_UpdatesTokensAndQuestions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         ((ISessionWriter)agent).BeginIteration("objective");
         var result = new ExpressResult(
             Output: "done",
@@ -242,16 +244,16 @@ public class QuestionTests
     // ==========================================================
 
     [Fact]
-    public void GetQuestions_ReturnsEmptyWhenNoSession()
+    public async Task GetQuestions_ReturnsEmptyWhenNoSession()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Empty(agent.GetQuestions());
     }
 
     [Fact]
-    public void GetQuestions_ReturnsAllQuestions()
+    public async Task GetQuestions_ReturnsAllQuestions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
 
@@ -259,9 +261,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void GetQuestions_FiltersByStatus()
+    public async Task GetQuestions_FiltersByStatus()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
         agent.FindQuestion("Q-001")!.SetAnswer("A1", "PjM");
@@ -271,9 +273,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void GetOpenQuestions_ReturnsOnlyOpen()
+    public async Task GetOpenQuestions_ReturnsOnlyOpen()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
         agent.FindQuestion("Q-001")!.SetAnswer("A1", "PjM");
@@ -284,9 +286,9 @@ public class QuestionTests
     }
 
     [Fact]
-    public void GetPendingReviewQuestions_ReturnsAnswered()
+    public async Task GetPendingReviewQuestions_ReturnsAnswered()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.FindQuestion("Q-001")!.SetAnswer("A1", "PjM");
 
@@ -300,9 +302,9 @@ public class QuestionTests
     // ==========================================================
 
     [Fact]
-    public void SupplyAnswers_TransitionsOpenToAnswered()
+    public async Task SupplyAnswers_TransitionsOpenToAnswered()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("Q-001", "Q1", "express");
         agent.RaiseQuestion("Q-002", "Q2", "express");
 
@@ -315,17 +317,17 @@ public class QuestionTests
     }
 
     [Fact]
-    public void SupplyAnswers_ThrowsWhenNoSession()
+    public async Task SupplyAnswers_ThrowsWhenNoSession()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Throws<InvalidOperationException>(() =>
             agent.SupplyAnswers([("Q-001", "Answer", "PjM")]));
     }
 
     [Fact]
-    public void SupplyAnswers_ThrowsForMissingQuestion()
+    public async Task SupplyAnswers_ThrowsForMissingQuestion()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
 
         Assert.Throws<InvalidOperationException>(() =>
             agent.SupplyAnswers([("MISSING", "Answer", "PjM")]));
@@ -388,10 +390,10 @@ public class QuestionTests
     // ==========================================================
 
     [Fact]
-    public void ExpressStep_BuildContext_IncludesAnsweredQuestions()
+    public async Task ExpressStep_BuildContext_IncludesAnsweredQuestions()
     {
         var step = new ExpressStep(PromptContext.Empty, 5, "instructions", new Gate("gate"));
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q001", "What scope?", "express");
         agent.FindQuestion("UX-Q001")!.SetAnswer("Football only", "PjM Interview");
 
@@ -404,10 +406,10 @@ public class QuestionTests
     }
 
     [Fact]
-    public void ExpressStep_BuildContext_NoQuestions_ShowsNoQuestionsLogged()
+    public async Task ExpressStep_BuildContext_NoQuestions_ShowsNoQuestionsLogged()
     {
         var step = new ExpressStep(PromptContext.Empty, 5, "instructions", new Gate("gate"));
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
 
         var context = step.BuildContext(agent);
 
@@ -421,7 +423,7 @@ public class QuestionTests
     [Fact]
     public async Task Pipeline_QuestionsFlowBetweenSessions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new QuestionAwareChatClient();
 
         // Session 1: Express raises questions

@@ -15,12 +15,12 @@ public class SkillConversationTests
     private const string TestDataPath = "TestData/UxPersonaRole.md";
     private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
         var role = RoleParser.ParseFromMarkdown(markdown);
-        IStepPromptLayer ctx = ((IAgentPromptLayer)PromptContext.Empty).WithRole(role);
-        return new UxPersona(role, TestSteps.DefaultSteps(ctx), "test-proj", TestMarkFilePaths);
+        var config = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     // --- Skill loading ---
@@ -34,7 +34,7 @@ public class SkillConversationTests
 
         Assert.Equal("Kickoff-context", skill.Name);
         Assert.Equal("Define objective for agent and reconstruct session from prior state.", skill.Description);
-        Assert.Contains("session checkpoint", skill.Instructions);
+        Assert.Contains("session checkpoint", skill.Content);
     }
 
     // --- JSON schema in messages ---
@@ -43,7 +43,7 @@ public class SkillConversationTests
     public async Task Step1_MessageContainsJsonSchema()
     {
         // Chain uses handler-level calls; schema is internal. Assistant message has synthesis JSON output.
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -56,7 +56,7 @@ public class SkillConversationTests
     [Fact]
     public async Task Step2_MessageContainsIslandsSchema()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client); // step 1
@@ -72,7 +72,7 @@ public class SkillConversationTests
     [Fact]
     public async Task Step3_MessageContainsOrganizeSchema()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -92,7 +92,7 @@ public class SkillConversationTests
     public async Task Step1_UserMessageContainsStepNumber()
     {
         // KickoffStep records a minimal tracking message: "## Step 1: KickoffStep"
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -106,7 +106,7 @@ public class SkillConversationTests
     [Fact]
     public async Task Step2_UserMessageContainsJsonSchema()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client); // step 1
@@ -123,7 +123,7 @@ public class SkillConversationTests
     [Fact]
     public async Task Step2_MessageContainsObjectiveFromStep1()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -138,7 +138,7 @@ public class SkillConversationTests
     [Fact]
     public async Task Step3_MessageContainsIslandsFromStep2()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -157,7 +157,7 @@ public class SkillConversationTests
     [Fact]
     public async Task SystemPrompt_ContainsRoleIdentity()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -172,7 +172,7 @@ public class SkillConversationTests
     [Fact]
     public async Task FullPipeline_WithSkills_MapsAllStepsToSession()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         var results = await agent.ExecuteAllStepsAsync(client);

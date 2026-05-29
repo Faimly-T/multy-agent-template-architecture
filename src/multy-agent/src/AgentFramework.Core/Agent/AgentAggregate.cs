@@ -16,8 +16,7 @@ public class AgentAggregate<TId> :
     IAgentRunContext
 {
     public TId Id { get; protected set; } = default!;
-    public Role Role { get; protected set; } = default!;
-    public IStepPromptLayer promptContext { get; init; }
+    protected IStepPromptLayer RolePromptAgentContext { get; private set; } = PromptContext.Empty;
 
     public AgentSession? Session { get; private set; }
 
@@ -61,11 +60,10 @@ public class AgentAggregate<TId> :
 
     protected AgentAggregate() { }
 
-    public AgentAggregate(TId id, Role role, string projectId, SessionMarkFilePaths markFilePaths)
+    public AgentAggregate(TId id, IStepPromptLayer agentPromptContext, string projectId, SessionMarkFilePaths markFilePaths)
     {
         Id = id;
-        Role = role;
-        promptContext = ((IAgentPromptLayer)PromptContext.Empty).WithRole(role);
+        RolePromptAgentContext = agentPromptContext;
         Session = new AgentSession(projectId, markFilePaths);
     }
 
@@ -146,10 +144,8 @@ public class AgentAggregate<TId> :
         string userIntent,
         IChatClient chatClient,
         IDeliverableWriter deliverableWriter,
-        IPipelineFactory pipelineFactory,
         CancellationToken ct = default)
     {
-        Pipeline = await pipelineFactory.CreatePipelineAsync(promptContext, ct);
         Session?.SetUserIntent(userIntent);
 
         var results = new List<StepResult>();

@@ -14,10 +14,12 @@ public class SessionMappingTests
     private const string TestDataPath = "TestData/UxPersonaRole.md";
     private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", TestMarkFilePaths);
+        var role = RoleParser.ParseFromMarkdown(markdown);
+        var config = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     // --- Step 1: Kickoff → maps Session Objective ---
@@ -25,7 +27,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step1_KickoffResult_MapsSessionObjective()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -38,7 +40,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step2_CaptureResult_MapsIslandsToSession()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -53,7 +55,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step2_CaptureResult_MapsIslandRelations()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -68,7 +70,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step3_OrganizeResult_UpdatesIslandStatuses()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(client); // Step 1
@@ -83,7 +85,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step3_OrganizeResult_RecordsDecisions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -100,7 +102,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step4_DistillResult_MapsDeliverablesAndIslandStatus()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteNextStepAsync(client); // 1
@@ -121,7 +123,7 @@ public class SessionMappingTests
     [Fact]
     public async Task Step5_ExpressResult_MapsTokenConsumption()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         await agent.ExecuteAllStepsAsync(client);
@@ -137,7 +139,7 @@ public class SessionMappingTests
     [Fact]
     public async Task FullPipeline_EmptySession_MapsAllSteps()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
         var results = await agent.ExecuteAllStepsAsync(client);
@@ -155,7 +157,7 @@ public class SessionMappingTests
     [Fact]
     public async Task BeforeKickoff_CheckpointIsNull()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
 
         Assert.NotNull(agent.Session);
         Assert.Null(agent.Session.CurrentCheckpoint);

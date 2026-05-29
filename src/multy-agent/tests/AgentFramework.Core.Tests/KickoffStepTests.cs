@@ -18,20 +18,12 @@ public class KickoffStepTests
     private static KickoffStep CreateStep() =>
         new(PromptContext.Empty, 1, "Session Objective. Parse product description.", new Gate("Objective confirmed"));
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        IStepPromptLayer ctx = ((IAgentPromptLayer)PromptContext.Empty).WithRole(role);
-        return new UxPersona(role, TestSteps.DefaultSteps(ctx), "test-proj", TestMarkFilePaths);
-    }
-
-    private static UxPersona CreateAgentWithSkills()
-    {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        IStepPromptLayer ctx = ((IAgentPromptLayer)PromptContext.Empty).WithRole(role);
-        return new UxPersona(role, TestSteps.DefaultSteps(ctx), "test-proj", TestMarkFilePaths);
+        var role     = RoleParser.ParseFromMarkdown(markdown);
+        var config   = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     // ==========================================================
@@ -163,9 +155,9 @@ public class KickoffStepTests
     // ==========================================================
 
     [Fact]
-    public void ApplyTo_UpdatesSessionObjective()
+    public async Task ApplyTo_UpdatesSessionObjective()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var result = new KickoffResult(
             Output: "json output",
             GateSatisfied: true,
@@ -179,9 +171,9 @@ public class KickoffStepTests
     }
 
     [Fact]
-    public void ApplyTo_PreservesExistingSessionState()
+    public async Task ApplyTo_PreservesExistingSessionState()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         agent.Session!.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "input")
         ]);
@@ -215,7 +207,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_WithRealSkill_ProducesKickoffResult()
     {
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         var result = await agent.ExecuteNextStepAsync(client);
@@ -223,7 +215,7 @@ public class KickoffStepTests
         Assert.NotNull(result);
         var Kickoff = Assert.IsType<KickoffResult>(result);
         Assert.True(Kickoff.GateSatisfied);
-            
+
         Assert.True(Kickoff.IsInitialSession);
         Assert.NotEmpty(Kickoff.NarrativeBridge);
     }
@@ -231,8 +223,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_MessageContainsSkillInstructions()
     {
-        // Chain adds a minimal step-tracking user message; skill instructions are in internal handler calls
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -244,8 +235,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_MessageContainsJsonSchema()
     {
-        // JSON schema is in internal ObjectiveSynthesisHandler calls; assistant message has synthesis result
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -257,8 +247,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_MessageContainsInitialSessionContext()
     {
-        // Session context is synthesized by chain handlers; conversation has step tracking only
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -270,7 +259,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_SessionUpdatedAfterExecution()
     {
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -285,7 +274,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_ConversationHasSystemUserAssistant()
     {
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -299,7 +288,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_SystemPromptContainsRoleIdentity()
     {
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -312,7 +301,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_WithBlockers_ParsesBlockerList()
     {
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q003", "No access to user research data", "express");
         agent.RaiseQuestion("UX-Q004", "Anti-persona priority unclear", "express");
         var client = new KickoffFakeChatClientWithBlockers();
@@ -328,7 +317,7 @@ public class KickoffStepTests
     [Fact]
     public async Task UxPersona_Step1_GateFailed_DoesNotAdvanceStep()
     {
-        var agent = CreateAgentWithSkills();
+        var agent = await CreateAgentAsync();
         var client = new KickoffGateFailChatClient();
 
         var result = await agent.ExecuteNextStepAsync(client);

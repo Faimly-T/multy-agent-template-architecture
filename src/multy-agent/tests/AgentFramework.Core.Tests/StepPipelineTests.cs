@@ -14,23 +14,25 @@ public class StepPipelineTests
     private const string TestDataPath = "TestData/UxPersonaRole.md";
     private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", TestMarkFilePaths);
+        var role = RoleParser.ParseFromMarkdown(markdown);
+        var config = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     [Fact]
-    public void UxPersona_Has5Steps()
+    public async Task UxPersona_Has5Steps()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Equal(5, agent.Steps.Count);
     }
 
     [Fact]
-    public void Steps_AreNumberedSequentially()
+    public async Task Steps_AreNumberedSequentially()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         for (int i = 0; i < agent.Steps.Count; i++)
         {
             Assert.Equal(i + 1, agent.Steps[i].StepNumber);
@@ -38,25 +40,25 @@ public class StepPipelineTests
     }
 
     [Fact]
-    public void Step1_UsesKickoffext()
+    public async Task Step1_UsesKickoffext()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Equal("Kickoff-context", agent.Steps[0].SkillName);
         Assert.Equal("Objective confirmed", agent.Steps[0].Gate.Description);
     }
 
     [Fact]
-    public void Step2_UsesAutonomousCapture()
+    public async Task Step2_UsesAutonomousCapture()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Equal("autonomous-capture", agent.Steps[1].SkillName);
         Assert.Equal("≥3 user-type islands", agent.Steps[1].Gate.Description);
     }
 
     [Fact]
-    public void NewAgent_StartsAtStep0_NotCompleted()
+    public async Task NewAgent_StartsAtStep0_NotCompleted()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Equal(0, agent.Pipeline.CurrentStepIndex);
         Assert.False(agent.IsCompleted);
     }
@@ -64,7 +66,7 @@ public class StepPipelineTests
     [Fact]
     public async Task ExecuteNextStep_AdvancesPipeline_WhenGatePasses()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
 
         var result = await agent.ExecuteNextStepAsync(client);
@@ -76,7 +78,7 @@ public class StepPipelineTests
     [Fact]
     public async Task ExecuteNextStep_DoesNotAdvancePipeline_WhenGateFails()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: false);
 
         var result = await agent.ExecuteNextStepAsync(client);
@@ -88,7 +90,7 @@ public class StepPipelineTests
     [Fact]
     public async Task ExecuteAllSteps_RunsAllSteps_WhenAllGatesPass()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
 
         var results = await agent.ExecuteAllStepsAsync(client);
@@ -101,20 +103,20 @@ public class StepPipelineTests
     [Fact]
     public async Task ExecuteAllSteps_StopsAtFailedGate()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(failAtStep: 3);
 
         var results = await agent.ExecuteAllStepsAsync(client);
 
         Assert.Equal(3, results.Count);
         Assert.False(agent.IsCompleted);
-        Assert.Equal(2, agent.Pipeline.CurrentStepIndex); // stopped at step 3 (index 2)
+        Assert.Equal(2, agent.Pipeline.CurrentStepIndex);
     }
 
     [Fact]
     public async Task ExecuteNextStep_ThrowsWhenAllCompleted()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
         await agent.ExecuteAllStepsAsync(client);
 
@@ -137,7 +139,6 @@ public class StepPipelineTests
             IReadOnlyList<ChatMessage> messages, string jsonSchema,
             Func<JsonElement, TResult> parse, CancellationToken ct = default)
         {
-            // Chain calls are always for KickoffStep (step 1)
             var passed = _failAtStep == 1 ? false : _gateSatisfied;
             var json = jsonSchema.Contains("triaged")
                 ? """{"triaged":[]}"""

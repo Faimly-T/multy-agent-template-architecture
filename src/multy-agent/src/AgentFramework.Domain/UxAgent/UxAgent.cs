@@ -1,4 +1,5 @@
 using AgentFramework.Core.Agent;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
 
@@ -6,19 +7,24 @@ namespace AgentFramework.Domain.UxAgent;
 
 public class UxPersona : AgentAggregate<string>
 {
-    public UxPersona(
-        Role pRole,
-        AgentStep[] pSteps,
-        string projectId,
+    private UxPersona(
+        string               agentId,
+        IStepPromptLayer     agentContext,
+        StepPipeline         pipeline,
+        string               projectId,
         SessionMarkFilePaths markFilePaths)
-        : base("ux-persona-architect", pRole, projectId, markFilePaths)
+        : base(agentId, agentContext, projectId, markFilePaths)
     {
-        if (pRole is null)
-            throw new InvalidOperationException("Role is required.");
+        Pipeline = pipeline;
+    }
 
-        if (pSteps.Length == 0)
-            throw new InvalidOperationException("At least one step is required.");
-
-        Pipeline = UxStepBuilder.Create().WithSteps(pSteps).Build();
+    public static async Task<UxPersona> BuildAsync(
+        UxPersonaConfig   config,
+        PipelineCode      pipelineCode,
+        CancellationToken ct = default)
+    {
+        var agentContext = ((IAgentPromptLayer)PromptContext.Empty).WithRole(config.Role);
+        var pipeline     = await pipelineCode.BuildAsync(agentContext, config.Pipeline, ct);
+        return new UxPersona(config.AgentId, agentContext, pipeline, config.ProjectId, config.MarkFilePaths);
     }
 }

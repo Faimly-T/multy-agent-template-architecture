@@ -1,10 +1,11 @@
 using System.Text.RegularExpressions;
+using AgentFramework.Core.Agent.Prompts;
 
 namespace AgentFramework.Core.Agent;
 
 public static class RoleParser
 {
-    public static Role ParseFromMarkdown(string markdown)
+    public static RoleDefinition ParseFromMarkdown(string markdown)
     {
         var name = ExtractFrontmatterField(markdown, "name");
         var description = ExtractFrontmatterField(markdown, "description");
@@ -12,7 +13,7 @@ public static class RoleParser
         var mandate = ParseMandate(markdown);
         var directives = ParseFactsAndDirectives(markdown);
 
-        return new Role(name, description, identity, mandate, directives);
+        return new RoleDefinition(name, description, identity, mandate, directives);
     }
 
     private static string ExtractFrontmatterField(string md, string field)
@@ -31,10 +32,10 @@ public static class RoleParser
         }
 
         return new Identity(
-            role: Extract("Role"),
-            persona: Extract("Persona"),
-            authority: Extract("Authority"),
-            boundary: Extract("Boundary"));
+            Role: Extract("Role"),
+            Persona: Extract("Persona"),
+            Authority: Extract("Authority"),
+            Boundary: Extract("Boundary"));
     }
 
     private static string ParseMandate(string md)

@@ -11,19 +11,16 @@ namespace AgentFramework.Core.Agent.Steps.CODESteps;
 public class KickoffStep : AgentStep
 {
     private readonly IMarkFileReader _markFileReader;
-    private readonly ISkillResolver? _skillResolver;
 
     public KickoffStep(
         IStepPromptLayer   stepContext,
         int                stepNumber,
         string             instructions,
         Gate               gate,
-        IMarkFileReader?   markFileReader = null,
-        ISkillResolver?    skillResolver  = null)
+        IMarkFileReader?   markFileReader = null)
         : base(stepContext, stepNumber, "Kickoff-context", instructions, gate)
     {
         _markFileReader = markFileReader ?? new NullMarkFileReader();
-        _skillResolver  = skillResolver;
     }
 
     public override string JsonResponseSchema => """
@@ -52,7 +49,7 @@ public class KickoffStep : AgentStep
             new MarkFileLoaderHandler(_markFileReader),
             new IterationEvaluatorHandler(),
             new QuestionTriageHandler(_markFileReader, _stepContext),
-            new ObjectiveSynthesisHandler(_stepContext, _skillResolver));
+            new ObjectiveSynthesisHandler(_stepContext));
 
         var (finalJson, journal) = await chain.RunAsync(context, writer, chatClient, ct);
 

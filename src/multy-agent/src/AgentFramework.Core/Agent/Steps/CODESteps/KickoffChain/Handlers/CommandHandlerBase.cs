@@ -5,8 +5,9 @@ using AgentFramework.Core.Agent.Session;
 
 namespace AgentFramework.Core.Agent.Steps.CODESteps.KickoffChain.Handlers;
 
+//TODO I need to review and check this selection of skills and how to build the prompt.
 internal abstract class CommandHandlerBase(
-    IStepPromptLayer? stepCtx             = null,
+    IStepPromptLayer? stepCtx              = null,
     string            synthesisInstruction = "",
     ISkillResolver?   resolver             = null) : ICommandHandler
 {
@@ -15,17 +16,27 @@ internal abstract class CommandHandlerBase(
     protected readonly ISkillResolver? Resolver             = resolver;
 
     protected virtual IReadOnlyList<ChatMessage> BuildPrompt(
-        string userContent, IReadOnlyList<Skill>? skills = null)
+        string userContent, 
+        bool withOutSkills = false,
+        IReadOnlyList<string>? skillNames = null)
     {
+        List<Skill>? skillSelected = null;
+        if (skillNames != null && skillNames.Count > 0 && _stepContext.Skills != null)
+        {
+            skillSelected = _stepContext.Skills.Where(s => skillNames.Contains(s.Name)).ToList();
+        }
+
+        var resolvedSkills = skillSelected != null || withOutSkills
+          ? skillSelected : _stepContext.Skills;
         var parts = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(_stepContext.RolePrompt))
             parts.Add($"You will act with the following Role:\n{_stepContext.RolePrompt}");
 
-        if (skills is { Count: > 0 })
+        if (resolvedSkills.Count > 0)
         {
             var skillsBlock = string.Join("\n\n",
-                skills.Select(s => $"### Skill: {s.Name}\n{s.Instructions}"));
+                resolvedSkills.Select(s => $"### Skill: {s.Name}\n{s.Content}"));
             parts.Add($"Available skill frameworks to execute the instruction:\n{skillsBlock}");
         }
 

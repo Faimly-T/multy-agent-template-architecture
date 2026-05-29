@@ -10,18 +10,20 @@ public class SessionTests
     private const string TestDataPath = "TestData/UxPersonaRole.md";
     private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", TestMarkFilePaths);
+        var role = RoleParser.ParseFromMarkdown(markdown);
+        var config = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     // --- Checkpoint ---
 
     [Fact]
-    public void BeginIteration_CreatesCheckpointWithObjective()
+    public async Task BeginIteration_CreatesCheckpointWithObjective()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         ((ISessionWriter)agent).BeginIteration("Define personas for recruiting platform");
 
         Assert.NotNull(agent.Session!.CurrentCheckpoint);
@@ -30,9 +32,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void BeginIteration_SetsDateToUtcNow()
+    public async Task BeginIteration_SetsDateToUtcNow()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var before = DateTime.UtcNow;
         ((ISessionWriter)agent).BeginIteration("objective");
         var after = DateTime.UtcNow;
@@ -41,9 +43,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void BeginIteration_InitializesTokenConsumptionToZero()
+    public async Task BeginIteration_InitializesTokenConsumptionToZero()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         ((ISessionWriter)agent).BeginIteration("objective");
 
         Assert.Equal(0, agent.Session!.CurrentCheckpoint!.TokensConsumption.InputTokens);
@@ -52,9 +54,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void UpdateTokenConsumption_UpdatesCheckpoint()
+    public async Task UpdateTokenConsumption_UpdatesCheckpoint()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         ((ISessionWriter)agent).BeginIteration("objective");
 
         ((ISessionWriter)agent).UpdateTokenConsumption(1500, 3000);
@@ -65,9 +67,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void BeginIteration_IterationStartsAt1()
+    public async Task BeginIteration_IterationStartsAt1()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         ((ISessionWriter)agent).BeginIteration("Continue personas");
 
         Assert.Equal(1, agent.Session!.CurrentCheckpoint!.SessionIteration);
@@ -76,9 +78,9 @@ public class SessionTests
     // --- Islands (via IslandBacklog) ---
 
     [Fact]
-    public void SetCaptured_AddsIslandsWithCapturedStatus()
+    public async Task SetCaptured_AddsIslandsWithCapturedStatus()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
 
         session.Backlog.SetCaptured([
@@ -95,9 +97,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void SetCaptured_PreservesRelatesToIslandId()
+    public async Task SetCaptured_PreservesRelatesToIslandId()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
 
         session.Backlog.SetCaptured([
@@ -110,9 +112,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_StatusTransitions_CapturedToOrganizedToDistilled()
+    public async Task Backlog_StatusTransitions_CapturedToOrganizedToDistilled()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.PainPoint, "No visibility", "interview")
@@ -128,9 +130,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_CanDiscardDuringOrganize()
+    public async Task Backlog_CanDiscardDuringOrganize()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.AntiUser, "Tourist", "capture"),
@@ -149,9 +151,9 @@ public class SessionTests
     // --- IslandBacklog Guard Tests ---
 
     [Fact]
-    public void Backlog_ApplyOrganization_ThrowsOnInvalidTransition_OrganizedToOrganized()
+    public async Task Backlog_ApplyOrganization_ThrowsOnInvalidTransition_OrganizedToOrganized()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
@@ -163,9 +165,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_ApplyDistillation_ThrowsWhenNotOrganized()
+    public async Task Backlog_ApplyDistillation_ThrowsWhenNotOrganized()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
@@ -176,9 +178,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_ApplyOrganization_ThrowsWhenAlreadyDiscarded()
+    public async Task Backlog_ApplyOrganization_ThrowsWhenAlreadyDiscarded()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
@@ -194,9 +196,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_ApplyDistillation_ThrowsWhenAlreadyDistilled()
+    public async Task Backlog_ApplyDistillation_ThrowsWhenAlreadyDistilled()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
@@ -211,9 +213,9 @@ public class SessionTests
     // --- ISessionWriter Invariant Tests ---
 
     [Fact]
-    public void SessionWriter_SetCapturedIslands_ThrowsOnDuplicateIds()
+    public async Task SessionWriter_SetCapturedIslands_ThrowsOnDuplicateIds()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var writer = (ISessionWriter)agent;
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -224,9 +226,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void SessionWriter_RaiseQuestion_ThrowsOnDuplicateId()
+    public async Task SessionWriter_RaiseQuestion_ThrowsOnDuplicateId()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var writer = (ISessionWriter)agent;
 
         writer.RaiseQuestion("Q-001", "First", "express-relay");
@@ -236,9 +238,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void SessionWriter_ApplyOrganization_ThrowsOnMissingIsland()
+    public async Task SessionWriter_ApplyOrganization_ThrowsOnMissingIsland()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var writer = (ISessionWriter)agent;
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -248,9 +250,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_Find_ReturnsCorrectIsland()
+    public async Task Backlog_Find_ReturnsCorrectIsland()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
@@ -264,9 +266,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void Backlog_Find_ReturnsNull_WhenNotFound()
+    public async Task Backlog_Find_ReturnsNull_WhenNotFound()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
 
         Assert.Null(session.Backlog.Find("NONEXISTENT"));
@@ -275,9 +277,9 @@ public class SessionTests
     // --- Deliverables (via ISessionWriter) ---
 
     [Fact]
-    public void ApplyDistillation_AddsDeliverable()
+    public async Task ApplyDistillation_AddsDeliverable()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
 
         ((ISessionWriter)agent).ApplyDistillation([], [
             new DeliverableRecord("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)
@@ -291,9 +293,9 @@ public class SessionTests
     }
 
     [Fact]
-    public void ApplyDistillation_SupportsAllStatuses()
+    public async Task ApplyDistillation_SupportsAllStatuses()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
 
         ((ISessionWriter)agent).ApplyDistillation([], [
             new DeliverableRecord("D1", "path/draft.md", DeliverableStatus.Draft),
@@ -310,9 +312,9 @@ public class SessionTests
     // --- Decisions (via ISessionWriter) ---
 
     [Fact]
-    public void ApplyOrganization_AddsDecision()
+    public async Task ApplyOrganization_AddsDecision()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var session = agent.Session!;
         session.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
@@ -332,24 +334,24 @@ public class SessionTests
     // --- Session attached to Agent ---
 
     [Fact]
-    public void Session_IsNotNull_AfterConstruction()
+    public async Task Session_IsNotNull_AfterConstruction()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.NotNull(agent.Session);
     }
 
     [Fact]
-    public void Session_HasNoCheckpoint_BeforeKickoff()
+    public async Task Session_HasNoCheckpoint_BeforeKickoff()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.NotNull(agent.Session);
         Assert.Null(agent.Session!.CurrentCheckpoint);
     }
 
     [Fact]
-    public void Session_SameInstance_AlwaysReturned()
+    public async Task Session_SameInstance_AlwaysReturned()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Same(agent.Session, agent.Session);
     }
 }

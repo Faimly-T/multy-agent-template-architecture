@@ -15,12 +15,12 @@ public class ConversationPipelineTests
     private const string TestDataPath = "TestData/UxPersonaRole.md";
     private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxPersona> CreateAgentAsync()
     {
         var markdown = File.ReadAllText(TestDataPath);
         var role = RoleParser.ParseFromMarkdown(markdown);
-        IStepPromptLayer ctx = ((IAgentPromptLayer)PromptContext.Empty).WithRole(role);
-        return new UxPersona(role, TestSteps.DefaultSteps(ctx), "test-proj", TestMarkFilePaths);
+        var config = TestSteps.DefaultUxConfig(role);
+        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
     }
 
     // --- Step 1: First interaction builds system + user messages ---
@@ -28,7 +28,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step1_BuildsSystemPromptWithRole_OnFirstInteraction()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -42,7 +42,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step1_BuildsUserPromptWithStepInstructions()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -55,7 +55,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step1_AssistantResponseIsRecorded()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -68,7 +68,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step1_MapsObjectiveToSession()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -81,7 +81,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step2_DoesNotDuplicateSystemPrompt()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client); // Step 1
@@ -94,7 +94,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step2_ConversationHasFullHistory()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client); // Step 1: system + user + assistant
@@ -107,7 +107,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step2_SendsFullHistoryToChatClient()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
@@ -120,7 +120,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task Step2_UserPromptIncludesSessionObjective()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client); // Step 1
@@ -136,7 +136,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task ConversationPipeline_GateFailed_StillRecordsAssistantMessage()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(failGate: true);
 
         await agent.ExecuteNextStepAsync(client);
@@ -152,7 +152,7 @@ public class ConversationPipelineTests
     [Fact]
     public async Task FullPipeline_AccumulatesConversation()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         var results = await agent.ExecuteAllStepsAsync(client);

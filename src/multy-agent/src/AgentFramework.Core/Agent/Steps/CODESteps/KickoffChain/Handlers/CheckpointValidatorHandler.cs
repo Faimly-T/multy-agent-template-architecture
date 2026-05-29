@@ -54,7 +54,7 @@ internal sealed class CheckpointValidatorCommand : CommandHandlerBase
             {string.Join("\n", lines)}
             """;
 
-        var messages = BuildPrompt(userContent);
+        var messages = BuildPrompt(userContent, withOutSkills: true);
         var json = await chatClient!.SendHandlerAsync(messages, Schema, root => root.GetRawText(), ct);
 
         return new HandlerExchange(

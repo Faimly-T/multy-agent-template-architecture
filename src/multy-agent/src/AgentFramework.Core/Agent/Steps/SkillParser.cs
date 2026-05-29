@@ -8,8 +8,8 @@ public static class SkillParser
     {
         var name = ExtractFrontmatter(markdown, "name");
         var description = ExtractFrontmatter(markdown, "description");
-        var instructions = ExtractBody(markdown);
-        return new Skill(name, description, instructions);
+        var content = ExtractBody(markdown);
+        return new Skill(name, description, content);
     }
 
     public static SkillSummary ParseSummaryFromMarkdown(string markdown)

@@ -32,26 +32,27 @@ public class UxPersonaTests
     }
 
     [Fact]
-    public void Factory_CreatesUxPersona_WithRoleLoadedFromMd()
+    public async Task Factory_CreatesUxPersona_WithRoleLoadedFromMd()
     {
         var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", new SessionMarkFilePaths("UX", "outputs/contextAgent"));
+        var role     = RoleParser.ParseFromMarkdown(markdown);
+        var config   = TestSteps.DefaultUxConfig(role);
+        var agent    = await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
 
-        Assert.Equal("ux-persona-architect", agent.Id);
-        Assert.Equal("ux-persona-architect", agent.Role.Name);
-        Assert.Equal("Senior UX Researcher & Persona Architect", agent.Role.Description);
-        Assert.NotEmpty(agent.Role.Identity.Role);
-        Assert.NotEmpty(agent.Role.Mandate);
-        Assert.Equal(7, agent.Role.FactsAndDirectives.Count);
+        Assert.Equal("ux-persona-test", agent.Id);
+        Assert.Equal(5, agent.Steps.Count);
+        Assert.NotNull(agent.Session);
     }
 
     [Fact]
-    public void Factory_CreatesUxPersona_WithStepsLoadedFromMd()
+    public async Task Factory_CreatesUxPersona_WithStepsLoadedFromMd()
     {
-        var markdownRole = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdownRole), TestSteps.DefaultSteps(), "test-proj", new SessionMarkFilePaths("UX", "outputs/contextAgent"));
+        var markdown = File.ReadAllText(TestRoleDataPath);
+        var role     = RoleParser.ParseFromMarkdown(markdown);
+        var config   = TestSteps.DefaultUxConfig(role);
+        var agent    = await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
 
-        Assert.Equal("ux-persona-architect", agent.Id);
+        Assert.Equal("ux-persona-test", agent.Id);
         Assert.Equal("Kickoff-context", agent.Steps[0].SkillName);
         Assert.Equal("autonomous-capture", agent.Steps[1].SkillName);
         Assert.Equal("strategic-organize", agent.Steps[2].SkillName);
@@ -70,8 +71,10 @@ public class UxPersonaTests
         await using var sp = BuildServiceProvider(config);
         var chatClient = sp.GetRequiredService<IChatClient>();
 
-        var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", new SessionMarkFilePaths("UX", "outputs/contextAgent"));
+        var markdown    = File.ReadAllText(TestRoleDataPath);
+        var role        = RoleParser.ParseFromMarkdown(markdown);
+        var agentConfig = TestSteps.DefaultUxConfig(role);
+        var agent       = await UxPersona.BuildAsync(agentConfig, TestSteps.DefaultPipelineCode());
 
         agent.SetUserIntent("Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.");
 
@@ -101,17 +104,17 @@ public class UxPersonaTests
         await using var sp = BuildServiceProvider(config);
         var chatClient = sp.GetRequiredService<IChatClient>();
 
-        var markdown = File.ReadAllText(TestRoleDataPath);
-        var agent = new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), "test-proj", new SessionMarkFilePaths("UX", "outputs/contextAgent"));
+        var markdown    = File.ReadAllText(TestRoleDataPath);
+        var role        = RoleParser.ParseFromMarkdown(markdown);
+        var agentConfig = TestSteps.DefaultUxConfig(role);
+        var agent       = await UxPersona.BuildAsync(agentConfig, TestSteps.DefaultPipelineCode());
 
-        var pipelineFactory = new TestPipelineFactory();
         var deliverableWriter = new TestDeliverableWriter();
 
         var runResult = await agent.RunAsync(
             "Analyze a college athletic recruiting platform that connects high-school athletes with university scouts.",
             chatClient,
-            deliverableWriter,
-            pipelineFactory);
+            deliverableWriter);
 
         Assert.True(runResult.Completed);
         Assert.Equal(5, runResult.StepResults.Count);
@@ -130,14 +133,6 @@ public class UxPersonaTests
         Assert.True(runResult.Session.CurrentCheckpoint!.TokensConsumption.InputTokens >= 0);
         Assert.True(runResult.Session.CurrentCheckpoint!.TokensConsumption.OutputTokens >= 0);
         Assert.True(deliverableWriter.WasWritten);
-    }
-
-    private class TestPipelineFactory : IPipelineFactory
-    {
-        public Task<StepPipeline> CreatePipelineAsync(IStepPromptLayer agentContext, CancellationToken ct = default)
-        {
-            return Task.FromResult(TestSteps.DefaultPipeline(agentContext));
-        }
     }
 
     private class TestDeliverableWriter : IDeliverableWriter

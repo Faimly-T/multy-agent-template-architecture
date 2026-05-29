@@ -21,10 +21,8 @@ internal sealed class ObjectiveSynthesisHandler : CommandHandlerBase
         "Synthesize a precise session objective from the context below. " +
         "Respond with valid JSON only.";
 
-    public ObjectiveSynthesisHandler(
-        IStepPromptLayer? stepCtx  = null,
-        ISkillResolver?   resolver = null)
-        : base(stepCtx, Instruction, resolver) { }
+    public ObjectiveSynthesisHandler(IStepPromptLayer? stepCtx = null)
+        : base(stepCtx, Instruction) { }
 
     public override async Task<HandlerExchange> ExecuteAiCommandAsync(
         IReadOnlyList<HandlerExchange> context,
@@ -33,6 +31,7 @@ internal sealed class ObjectiveSynthesisHandler : CommandHandlerBase
         IChatClient? chatClient,
         CancellationToken ct)
     {
+
         var checkpointContext = context.GetOutput(nameof(CheckpointValidatorCommand));
         var markFileContext   = context.GetOutput(nameof(MarkFileLoaderHandler));
         var questionContext   = context.GetOutput(nameof(QuestionTriageHandler));
@@ -59,12 +58,9 @@ internal sealed class ObjectiveSynthesisHandler : CommandHandlerBase
               6. gateSatisfied — true if objective is well-formed, false if missing required elements
             """;
 
-        // Pattern A: explicit skill names if resolver is configured
-        IReadOnlyList<Skill> skills = [];
-        if (Resolver is not null)
-            skills = await Resolver.ResolveAsync(["kickoff-context"], ct);
-
-        var messages = BuildPrompt(userContent, skills);
+        // Skills are pre-loaded into stepCtx.Skills by PipelineCode — BuildPrompt picks them up
+        //TODO: here I need to switch and be capable to send the instruction or the name of the skill that I want to unse on this/
+        var messages = BuildPrompt(userContent, skillNames: ["Kickoff-context"]);
         var json = await chatClient!.SendHandlerAsync(messages, Schema, root => root.GetRawText(), ct);
 
         return new HandlerExchange(

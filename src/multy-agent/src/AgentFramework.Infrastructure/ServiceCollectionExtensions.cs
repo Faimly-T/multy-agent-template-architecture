@@ -1,4 +1,5 @@
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Infrastructure.Anthropic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ public static class DIRegistrations
             });
 
         services.AddHttpClient<IChatClient, AnthropicChatClient>();
+        services.AddScoped<PipelineCode>();
 
         return services;
     }
