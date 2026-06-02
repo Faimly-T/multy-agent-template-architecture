@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AgentFramework.Core\AgentFramework.Core.csproj" />
+    <ProjectReference Include="..\AgentFramework.CodePipeline\AgentFramework.CodePipeline.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

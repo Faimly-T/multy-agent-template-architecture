@@ -1,6 +1,6 @@
 using AgentFramework.Core.Agent.Ports;
-using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Infrastructure.Anthropic;
+using AgentFramework.Infrastructure.Messaging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +17,9 @@ public static class DIRegistrations
             });
 
         services.AddHttpClient<IChatClient, AnthropicChatClient>();
-        services.AddScoped<PipelineCode>();
+
+        // Default to mock publisher — swap with a real broker implementation in production
+        services.AddSingleton<IMessagePublisher, MockMessagePublisher>();
 
         return services;
     }

@@ -5,22 +5,18 @@ using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 public class SkillConversationTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
-    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static async Task<UxPersona> CreateAgentAsync()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        var config = TestSteps.DefaultUxConfig(role);
-        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     // --- Skill loading ---
@@ -37,24 +33,23 @@ public class SkillConversationTests
         Assert.Contains("session checkpoint", skill.Content);
     }
 
-    // --- JSON schema in messages ---
+    // --- Step journals contain the LLM output ---
 
     [Fact]
-    public async Task Step1_MessageContainsJsonSchema()
+    public async Task Step1_JournalOutputContainsKickoffJson()
     {
-        // Chain uses handler-level calls; schema is internal. Assistant message has synthesis JSON output.
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
 
-        var assistantMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.Assistant);
-        Assert.Contains("sessionObjective", assistantMsg.Content);
-        Assert.Contains("gateSatisfied", assistantMsg.Content);
+        var output = agent.GetStepJournal("KickoffStep")[^1].Content.Output;
+        Assert.Contains("sessionObjective", output);
+        Assert.Contains("gateSatisfied", output);
     }
 
     [Fact]
-    public async Task Step2_MessageContainsIslandsSchema()
+    public async Task Step2_JournalOutputContainsIslandsJson()
     {
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
@@ -62,15 +57,13 @@ public class SkillConversationTests
         await agent.ExecuteNextStepAsync(client); // step 1
         await agent.ExecuteNextStepAsync(client); // step 2
 
-        var step2Msg = agent.ConversationMessages
-            .Where(m => m.Role == MessageRole.User)
-            .Skip(1).First();
-        Assert.Contains("islands", step2Msg.Content);
-        Assert.Contains("relatesToIslandId", step2Msg.Content);
+        var output = agent.GetStepJournal("CaptureStep")[^1].Content.Output;
+        Assert.Contains("islands", output);
+        Assert.Contains("relatesToIslandId", output);
     }
 
     [Fact]
-    public async Task Step3_MessageContainsOrganizeSchema()
+    public async Task Step3_JournalOutputContainsOrganizeJson()
     {
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
@@ -79,32 +72,13 @@ public class SkillConversationTests
         await agent.ExecuteNextStepAsync(client);
         await agent.ExecuteNextStepAsync(client);
 
-        var step3Msg = agent.ConversationMessages
-            .Where(m => m.Role == MessageRole.User)
-            .Skip(2).First();
-        Assert.Contains("organizedIslands", step3Msg.Content);
-        Assert.Contains("decisions", step3Msg.Content);
+        var output = agent.GetStepJournal("OrganizeStep")[^1].Content.Output;
+        Assert.Contains("organizedIslands", output);
+        Assert.Contains("groups", output);
     }
 
-    // --- Step 1 tracking message ---
-
     [Fact]
-    public async Task Step1_UserMessageContainsStepNumber()
-    {
-        // KickoffStep records a minimal tracking message: "## Step 1: KickoffStep"
-        var agent = await CreateAgentAsync();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-
-        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("Step 1", userMsg.Content);
-    }
-
-    // --- JSON schema in user content for non-kickoff steps ---
-
-    [Fact]
-    public async Task Step2_UserMessageContainsJsonSchema()
+    public async Task Step2_JournalOutputContainsGateSatisfied()
     {
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
@@ -112,59 +86,9 @@ public class SkillConversationTests
         await agent.ExecuteNextStepAsync(client); // step 1
         await agent.ExecuteNextStepAsync(client); // step 2
 
-        var step2Msg = agent.ConversationMessages
-            .Where(m => m.Role == MessageRole.User)
-            .Skip(1).First();
-        Assert.Contains("Respond ONLY", step2Msg.Content);
-    }
-
-    // --- Session state flows through conversation ---
-
-    [Fact]
-    public async Task Step2_MessageContainsObjectiveFromStep1()
-    {
-        var agent = await CreateAgentAsync();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-        await agent.ExecuteNextStepAsync(client);
-
-        var step2Msg = agent.ConversationMessages
-            .Where(m => m.Role == MessageRole.User)
-            .Skip(1).First();
-        Assert.Contains("Build personas for college athletic recruiting platform", step2Msg.Content);
-    }
-
-    [Fact]
-    public async Task Step3_MessageContainsIslandsFromStep2()
-    {
-        var agent = await CreateAgentAsync();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-        await agent.ExecuteNextStepAsync(client);
-        await agent.ExecuteNextStepAsync(client);
-
-        var step3Msg = agent.ConversationMessages
-            .Where(m => m.Role == MessageRole.User)
-            .Skip(2).First();
-        Assert.Contains("ISL-001", step3Msg.Content);
-        Assert.Contains("Student athlete", step3Msg.Content);
-    }
-
-    // --- System prompt includes role identity ---
-
-    [Fact]
-    public async Task SystemPrompt_ContainsRoleIdentity()
-    {
-        var agent = await CreateAgentAsync();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-
-        var sysMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.System);
-        Assert.Contains("Clara Mendes", sysMsg.Content);
-        Assert.Contains("Senior UX Researcher", sysMsg.Content);
+        var output = agent.GetStepJournal("CaptureStep")[^1].Content.Output;
+        Assert.Contains("islands", output);
+        Assert.Contains("gateSatisfied", output);
     }
 
     // --- Full pipeline ---
@@ -175,9 +99,9 @@ public class SkillConversationTests
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        var results = await agent.ExecuteAllStepsAsync(client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
-        Assert.Equal(5, results.Count);
+        Assert.Equal(6, results.Count);
         Assert.True(agent.IsCompleted);
         Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
         Assert.Equal(3, agent.Session.Islands.Count);
@@ -194,9 +118,23 @@ public class SkillConversationTests
             IReadOnlyList<ChatMessage> messages, string jsonSchema,
             Func<JsonElement, TResult> parse, CancellationToken ct = default)
         {
-            var json = jsonSchema.Contains("triaged")
-                ? """{"triaged":[]}"""
-                : """{"sessionObjective":"Build personas for college athletic recruiting platform","narrativeBridge":"Initial session — no prior context.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[]}""";
+            else if (jsonSchema.Contains("groupDistillations"))
+                json = """{"groupDistillations":[{"groupId":"GRP-001","decisions":[{"id":"DEC-001","description":"Merge pain into athlete","impact":"Cleaner model"}],"deliverables":[{"deliverableId":"DEL-001","path":"outputs/personas/01-athlete.md","purpose":"Athlete persona card","status":"Complete"}],"questions":[]}],"distilledIslands":[{"islandId":"ISL-001","newStatus":"Distilled"},{"islandId":"ISL-002","newStatus":"Distilled"}],"gateSatisfied":true}""";
+            else if (jsonSchema.Contains("readiness"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting","readiness":"Ready","readinessNotes":null}]}""";
+            else if (jsonSchema.Contains("islandIds"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting"}],"ungroupedIslandIds":["ISL-003"]}""";
+            else if (jsonSchema.Contains("islands"))
+                json = """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete seeking recruitment","source":"six-hats:yellow","relatesToIslandId":null},{"id":"ISL-002","type":"Stakeholder","description":"College coach evaluating talent","source":"six-hats:white","relatesToIslandId":null},{"id":"ISL-003","type":"PainPoint","description":"No visibility into recruiting process","source":"six-hats:black","relatesToIslandId":"ISL-001"}]}""";
+            else if (jsonSchema.Contains("\"html\""))
+                json = """{"html":"<html><body>Test Document</body></html>"}""";
+            else if (jsonSchema.Contains("inputTokens"))
+                json = """{"questions":[],"inputTokens":2000,"outputTokens":5000,"gateSatisfied":true}""";
+            else
+                json = """{"sessionObjective":"Build personas for college athletic recruiting platform","narrativeBridge":"Initial session — no prior context.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
             return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
         }
 

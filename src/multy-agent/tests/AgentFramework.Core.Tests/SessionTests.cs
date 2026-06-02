@@ -1,21 +1,17 @@
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Session;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 public class SessionTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
-    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static async Task<UxPersona> CreateAgentAsync()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        var config = TestSteps.DefaultUxConfig(role);
-        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     // --- Checkpoint ---
@@ -246,7 +242,7 @@ public class SessionTests
         Assert.Throws<InvalidOperationException>(() =>
             writer.ApplyOrganization(
                 [new IslandOrganization("MISSING", IslandStatus.Organized)],
-                []));
+                [], []));
     }
 
     [Fact]
@@ -281,9 +277,9 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
 
-        ((ISessionWriter)agent).ApplyDistillation([], [
-            new DeliverableRecord("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)
-        ]);
+        ((IDeliverableTracker)agent).TrackDeliverables(
+            [new DeliverableRecord("DEL-001", "outputs/personas/01-athlete.md", DeliverableStatus.Complete)],
+            []);
 
         Assert.Single(agent.Deliverables);
         var d = agent.Deliverables[0];
@@ -297,11 +293,13 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
 
-        ((ISessionWriter)agent).ApplyDistillation([], [
-            new DeliverableRecord("D1", "path/draft.md", DeliverableStatus.Draft),
-            new DeliverableRecord("D2", "path/partial.md", DeliverableStatus.Partial),
-            new DeliverableRecord("D3", "path/done.md", DeliverableStatus.Complete)
-        ]);
+        ((IDeliverableTracker)agent).TrackDeliverables(
+            [
+                new DeliverableRecord("D1", "path/draft.md",    DeliverableStatus.Draft),
+                new DeliverableRecord("D2", "path/partial.md",  DeliverableStatus.Partial),
+                new DeliverableRecord("D3", "path/done.md",     DeliverableStatus.Complete)
+            ],
+            []);
 
         Assert.Equal(3, agent.Deliverables.Count);
         Assert.Equal(DeliverableStatus.Draft, agent.Deliverables[0].Status);
@@ -322,7 +320,8 @@ public class SessionTests
 
         ((ISessionWriter)agent).ApplyOrganization(
             [new IslandOrganization("ISL-001", IslandStatus.Organized)],
-            [new DecisionRecord("DEC-001", "Merge athlete and recruit into one persona", "Reduces persona count from 4 to 3")]);
+            [new DecisionRecord("DEC-001", "Merge athlete and recruit into one persona", "Reduces persona count from 4 to 3")],
+            []);
 
         Assert.Single(agent.Decisions);
         var dec = agent.Decisions[0];

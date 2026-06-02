@@ -115,8 +115,14 @@ public sealed class AnthropicChatClient : IChatClient, IDisposable
         return (system, apiMessages);
     }
 
-    private static string ExtractText(AnthropicResponse response)
+    private string ExtractText(AnthropicResponse response)
     {
+        if (response.StopReason is "max_tokens")
+            throw new InvalidOperationException(
+                $"Anthropic API response was truncated (stop_reason: max_tokens). " +
+                $"Increase {nameof(AnthropicOptions)}.{nameof(AnthropicOptions.MaxTokens)} " +
+                $"(current: {_options.MaxTokens}). Model: {_options.Model}.");
+
         var textBlock = response.Content?.FirstOrDefault(c => c.Type == "text");
         return textBlock?.Text ?? string.Empty;
     }
@@ -164,7 +170,8 @@ public sealed class AnthropicChatClient : IChatClient, IDisposable
     private sealed class AnthropicResponse
     {
         public List<ContentBlock>? Content { get; init; }
-        public UsageBlock? Usage { get; init; }
+        public string?             StopReason { get; init; }
+        public UsageBlock?         Usage { get; init; }
     }
 
     private sealed class ContentBlock

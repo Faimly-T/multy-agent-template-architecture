@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AgentFramework.Core\AgentFramework.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentFramework.CodePipeline\AgentFramework.CodePipeline.csproj" />
     <ProjectReference Include="..\..\src\AgentFramework.Domain\AgentFramework.Domain.csproj" />
     <ProjectReference Include="..\..\src\AgentFramework.Infrastructure\AgentFramework.Infrastructure.csproj" />
   </ItemGroup>

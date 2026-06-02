@@ -3,43 +3,39 @@ namespace AgentFramework.Core.Agent.Session;
 public class AgentSession
 {
     public string ProjectId { get; private set; }
-    public SessionMarkFilePaths MarkFilePaths { get; private set; }
 
     private readonly List<Checkpoint> _checkpoints = [];
     public IReadOnlyList<Checkpoint> Checkpoints => _checkpoints.AsReadOnly();
     public Checkpoint? CurrentCheckpoint => _checkpoints.Count > 0 ? _checkpoints[^1] : null;
 
-    public IslandBacklog Backlog { get; } = new();
-    public IReadOnlyList<Island> Islands => Backlog.All;
+    /// <summary>
+    /// The agent's reasoning state — all captured islands, semantic groups, and decisions
+    /// made throughout the pipeline run. See <see cref="AgentBrain"/> for details.
+    /// </summary>
+    public AgentBrain Brain { get; } = new();
 
-    public SessionHistory? History { get; private set; }
+    // Convenience delegates into Brain for handlers that read islands/groups directly off the session.
+    public IReadOnlyList<Island>      Islands => Brain.Backlog.All;
+    public IslandBacklog              Backlog => Brain.Backlog;
+    public IReadOnlyList<IslandGroup> Groups  => Brain.Groups;
 
-    public string? UserIntent { get; private set; }
-    internal void SetUserIntent(string intent) => UserIntent = intent;
-
-    public AgentSession(string projectId, SessionMarkFilePaths markFilePaths)
+    public AgentSession(string projectId)
     {
         ProjectId = projectId;
-        MarkFilePaths = markFilePaths;
     }
 
     // --- Iteration lifecycle ---
 
-    internal Checkpoint BeginIteration(string objective)
+    internal Checkpoint BeginIteration(string sessionObjective, string userIntent)
     {
         var cp = new Checkpoint(
-            CreatedAt: DateTime.UtcNow,
-            SessionIteration: _checkpoints.Count + 1,
-            SessionObjective: objective,
+            SessionIteration:  _checkpoints.Count + 1,
+            CreatedAt:         DateTime.UtcNow,
+            UserIntent:        userIntent,
+            SessionObjective:  sessionObjective,
             TokensConsumption: new TokenConsumption(0, 0));
         _checkpoints.Add(cp);
         return cp;
-    }
-
-    internal void UpdateObjective(string sessionObjective)
-    {
-        if (_checkpoints.Count == 0) return;
-        _checkpoints[^1] = _checkpoints[^1] with { SessionObjective = sessionObjective };
     }
 
     internal void UpdateTokenConsumption(int inputTokens, int outputTokens)
@@ -51,7 +47,9 @@ public class AgentSession
         };
     }
 
-    // --- History ---
-
-    internal void LoadHistory(SessionHistory history) => History = history;
+    internal void FinalizeSession(DateTime closedAt)
+    {
+        if (_checkpoints.Count == 0) return;
+        _checkpoints[^1] = _checkpoints[^1] with { ClosedAt = closedAt };
+    }
 }

@@ -1,10 +1,10 @@
 using System.Text.Json;
+using AgentFramework.CodePipeline;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
-using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Domain.UxAgent;
 
@@ -12,18 +12,14 @@ namespace AgentFramework.Core.Tests;
 
 public class KickoffStepTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
-    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
     private static KickoffStep CreateStep() =>
         new(PromptContext.Empty, 1, "Session Objective. Parse product description.", new Gate("Objective confirmed"));
 
-    private static async Task<UxPersona> CreateAgentAsync()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role     = RoleParser.ParseFromMarkdown(markdown);
-        var config   = TestSteps.DefaultUxConfig(role);
-        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     // ==========================================================
@@ -201,11 +197,11 @@ public class KickoffStepTests
     }
 
     // ==========================================================
-    // UxPersona agent — full first step with real skill
+    // UxAgent agent — full first step with real skill
     // ==========================================================
 
     [Fact]
-    public async Task UxPersona_Step1_WithRealSkill_ProducesKickoffResult()
+    public async Task UxAgent_Step1_WithRealSkill_ProducesKickoffResult()
     {
         var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
@@ -221,43 +217,30 @@ public class KickoffStepTests
     }
 
     [Fact]
-    public async Task UxPersona_Step1_MessageContainsSkillInstructions()
+    public async Task UxAgent_Step1_JournalIsRecorded()
     {
         var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
 
-        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("Step 1", userMsg.Content);
+        Assert.NotEmpty(agent.GetStepJournal("KickoffStep"));
     }
 
     [Fact]
-    public async Task UxPersona_Step1_MessageContainsJsonSchema()
+    public async Task UxAgent_Step1_JournalOutputContainsSessionObjective()
     {
         var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
 
         await agent.ExecuteNextStepAsync(client);
 
-        var assistantMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.Assistant);
-        Assert.Contains("sessionObjective", assistantMsg.Content);
+        var output = agent.GetStepJournal("KickoffStep")[^1].Content.Output;
+        Assert.Contains("sessionObjective", output);
     }
 
     [Fact]
-    public async Task UxPersona_Step1_MessageContainsInitialSessionContext()
-    {
-        var agent = await CreateAgentAsync();
-        var client = new KickoffFakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-
-        var userMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.User);
-        Assert.Contains("Step 1", userMsg.Content);
-    }
-
-    [Fact]
-    public async Task UxPersona_Step1_SessionUpdatedAfterExecution()
+    public async Task UxAgent_Step1_SessionUpdatedAfterExecution()
     {
         var agent = await CreateAgentAsync();
         var client = new KickoffFakeChatClient();
@@ -272,34 +255,7 @@ public class KickoffStepTests
     }
 
     [Fact]
-    public async Task UxPersona_Step1_ConversationHasSystemUserAssistant()
-    {
-        var agent = await CreateAgentAsync();
-        var client = new KickoffFakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-
-        Assert.True(agent.ConversationMessages.Count >= 3);
-        Assert.Equal(MessageRole.System, agent.ConversationMessages[0].Role);
-        Assert.Equal(MessageRole.User, agent.ConversationMessages[1].Role);
-        Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
-    }
-
-    [Fact]
-    public async Task UxPersona_Step1_SystemPromptContainsRoleIdentity()
-    {
-        var agent = await CreateAgentAsync();
-        var client = new KickoffFakeChatClient();
-
-        await agent.ExecuteNextStepAsync(client);
-
-        var sysMsg = agent.ConversationMessages.First(m => m.Role == MessageRole.System);
-        Assert.Contains("Clara Mendes", sysMsg.Content);
-        Assert.Contains("Senior UX Researcher", sysMsg.Content);
-    }
-
-    [Fact]
-    public async Task UxPersona_Step1_WithBlockers_ParsesBlockerList()
+    public async Task UxAgent_Step1_WithBlockers_ParsesBlockerList()
     {
         var agent = await CreateAgentAsync();
         agent.RaiseQuestion("UX-Q003", "No access to user research data", "express");
@@ -315,7 +271,7 @@ public class KickoffStepTests
     }
 
     [Fact]
-    public async Task UxPersona_Step1_GateFailed_DoesNotAdvanceStep()
+    public async Task UxAgent_Step1_GateFailed_DoesNotAdvanceStep()
     {
         var agent = await CreateAgentAsync();
         var client = new KickoffGateFailChatClient();

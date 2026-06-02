@@ -5,22 +5,18 @@ using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 public class QuestionTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
-    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static async Task<UxPersona> CreateAgentAsync()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        var config = TestSteps.DefaultUxConfig(role);
-        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     // ==========================================================
@@ -427,9 +423,9 @@ public class QuestionTests
         var client = new QuestionAwareChatClient();
 
         // Session 1: Express raises questions
-        var results = await agent.ExecuteAllStepsAsync(client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
-        Assert.Equal(5, results.Count);
+        Assert.Equal(6, results.Count);
         Assert.Equal(2, agent.GetOpenQuestions().Count);
 
         // Between sessions: user answers questions
@@ -450,9 +446,23 @@ public class QuestionTests
             IReadOnlyList<ChatMessage> messages, string jsonSchema,
             Func<JsonElement, TResult> parse, CancellationToken ct = default)
         {
-            var json = jsonSchema.Contains("triaged")
-                ? """{"triaged":[]}"""
-                : """{"sessionObjective":"Build personas","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[]}""";
+            else if (jsonSchema.Contains("groupDistillations"))
+                json = """{"groupDistillations":[{"groupId":"GRP-001","decisions":[{"id":"DEC-001","description":"Merge pain into athlete","impact":"Reduces count"}],"deliverables":[{"deliverableId":"DEL-001","path":"outputs/personas/01-athlete.md","purpose":"Athlete card","status":"Complete"}],"questions":[]}],"distilledIslands":[{"islandId":"ISL-001","newStatus":"Distilled"},{"islandId":"ISL-002","newStatus":"Distilled"}],"gateSatisfied":true}""";
+            else if (jsonSchema.Contains("readiness"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting","readiness":"Ready","readinessNotes":null}]}""";
+            else if (jsonSchema.Contains("islandIds"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting"}],"ungroupedIslandIds":["ISL-003"]}""";
+            else if (jsonSchema.Contains("islands"))
+                json = """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete","source":"six-hats:yellow","relatesToIslandId":null},{"id":"ISL-002","type":"Stakeholder","description":"College coach","source":"six-hats:white","relatesToIslandId":null},{"id":"ISL-003","type":"PainPoint","description":"No visibility","source":"six-hats:black","relatesToIslandId":"ISL-001"}]}""";
+            else if (jsonSchema.Contains("\"html\""))
+                json = """{"html":"<html><body>Test Document</body></html>"}""";
+            else if (jsonSchema.Contains("inputTokens"))
+                json = """{"questions":[{"id":"UX-Q001","text":"Is scope football-only?","status":"open"},{"id":"UX-Q002","text":"Geographic scope?","status":"open"}],"inputTokens":2000,"outputTokens":5000,"gateSatisfied":true}""";
+            else
+                json = """{"sessionObjective":"Build personas","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
             return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
         }
 

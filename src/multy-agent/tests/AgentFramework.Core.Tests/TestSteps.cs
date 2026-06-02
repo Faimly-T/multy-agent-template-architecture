@@ -1,7 +1,8 @@
+using AgentFramework.CodePipeline;
+using AgentFramework.Core.Agent;
+using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Prompts;
-using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
 using AgentFramework.Core.Tests.TestHelpers;
 using AgentFramework.Domain.UxAgent;
 
@@ -10,88 +11,49 @@ namespace AgentFramework.Core.Tests;
 internal static class TestSteps
 {
     private const string SkillsBasePath = "TestData/Skills";
+    private const string RolePath       = "TestData/UxAgentRole.md";
 
-    // -------------------------------------------------------
-    // Raw step construction (for unit tests that test steps directly)
-    // -------------------------------------------------------
+    // ── Intent constants ──────────────────────────────────────────────────────
+
+    /// <summary>General-purpose intent for pipeline tests that don't target a specific scenario.</summary>
+    public const string DefaultIntent =
+        "Build buyer personas for a college athletic recruiting platform.";
+
+    /// <summary>Scholarship scenario intent used by <c>PersonaWorkshopPipelineTests</c>.</summary>
+    public const string ScholarshipIntent =
+        "I want to build a system to search and profile potential leads for athlete student scholarships.";
+
+    // ── Skill resolver ────────────────────────────────────────────────────────
+
+    /// <summary>Flat-file skill resolver pointing at the test data Skills folder.</summary>
+    public static ISkillResolver DefaultResolver() => new FlatFileSkillResolver(SkillsBasePath);
+
+    // ── Role helper ───────────────────────────────────────────────────────────
+
+    /// <summary>Parses the default test role from markdown.</summary>
+    public static RoleDefinition DefaultRole() =>
+        RoleParser.ParseFromMarkdown(File.ReadAllText(RolePath));
+
+    // ── Config DTO (for the config-driven / integration path) ─────────────────
+
+    public static AgentConfig DefaultUxConfig(RoleDefinition role) =>
+        UxAgentDefaults.Config(role);
+
+    // ── Raw steps (for unit tests that construct steps directly) ─────────────
 
     public static AgentStep[] DefaultSteps(IStepPromptLayer? stepContext = null)
     {
         var ctx = stepContext ?? PromptContext.Empty;
         return
         [
-            new KickoffStep(
-                stepContext:  ctx,
-                stepNumber:   1,
-                instructions: "Session Objective. Parse product description.",
-                gate:         new Gate("Objective confirmed")),
-
-            new CaptureStep(
-                stepContext:  ctx,
-                stepNumber:   2,
-                instructions: "Hunt for user types · goals · pain points · behavioral patterns.",
-                gate:         new Gate("≥3 user-type islands")),
-
-            new OrganizeStep(
-                stepContext:  ctx,
-                stepNumber:   3,
-                instructions: "Cluster by person → proto-persona. Merge overlapping clusters.",
-                gate:         new Gate("2-5 ranked candidates")),
-
-            new DistillStep(
-                stepContext:  ctx,
-                stepNumber:   4,
-                instructions: "Produce Persona Cards per template. JTBD for each.",
-                gate:         new Gate("All → Card or Concern")),
-
-            new ExpressStep(
-                stepContext:  ctx,
-                stepNumber:   5,
-                instructions: "Write cards. Emit relay. Record token usage.",
-                gate:         new Gate("Session + Cards + Relay + Token Usage logged")),
+            new KickoffStep(ctx, 1, "Session Objective. Parse product description.",          new Gate("Objective confirmed")),
+            new CaptureStep(ctx, 2, "Hunt for user types · goals · pain points · patterns.",  new Gate("≥3 user-type islands")),
+            new OrganizeStep(ctx, 3, "Cluster by person → proto-persona.",                    new Gate("2-5 ranked candidates")),
+            new DistillStep(ctx,  4, "Produce Persona Cards per template. JTBD for each.",    new Gate("All → Card or Concern")),
+            new ExpressStep(ctx,  5, "Write cards. Emit relay. Record token usage.",           new Gate("Session + Cards logged")),
         ];
     }
 
     public static StepPipeline DefaultPipeline(IStepPromptLayer? stepContext = null) =>
         new StepPipeline(DefaultSteps(stepContext));
-
-    // -------------------------------------------------------
-    // Config-based construction (for agent-level tests)
-    // -------------------------------------------------------
-
-    public static CodePipelineConfig DefaultConfig() => new(
-        Kickoff:  new StepSkillConfig(
-            Instructions: "Session Objective. Parse product description.",
-            Gate:         new Gate("Objective confirmed"),
-            SkillNames:   ["Kickoff-context", "okr-kickoff-strategy"]),
-
-        Capture:  new StepSkillConfig(
-            Instructions: "Hunt for user types · goals · pain points · behavioral patterns.",
-            Gate:         new Gate("≥3 user-type islands"),
-            SkillNames:   ["autonomous-capture"]),
-
-        Organize: new StepSkillConfig(
-            Instructions: "Cluster by person → proto-persona. Merge overlapping clusters.",
-            Gate:         new Gate("2-5 ranked candidates"),
-            SkillNames:   ["strategic-organize"]),
-
-        Distill:  new StepSkillConfig(
-            Instructions: "Produce Persona Cards per template. JTBD for each.",
-            Gate:         new Gate("All → Card or Concern"),
-            SkillNames:   ["expert-distill"]),
-
-        Express:  new StepSkillConfig(
-            Instructions: "Write cards. Emit relay. Record token usage.",
-            Gate:         new Gate("Session + Cards + Relay + Token Usage logged"),
-            SkillNames:   ["express-relay"]));
-
-    public static PipelineCode DefaultPipelineCode() =>
-        new(new FlatFileSkillResolver(SkillsBasePath));
-
-    public static UxPersonaConfig DefaultUxConfig(RoleDefinition role) => new(
-        AgentId:       "ux-persona-test",
-        ProjectId:     "test-proj",
-        MarkFilePaths: new SessionMarkFilePaths("UX", "outputs/contextAgent"),
-        Role:          role,
-        Pipeline:      DefaultConfig());
 }

@@ -69,7 +69,16 @@
       "PowerShell(\"Deleted\")",
       "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Prompts\\\\ICommandPromptLayer.cs\")",
       "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Ports\\\\IPipelineFactory.cs\")",
-      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Role.cs\")"
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Role.cs\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.CodePipeline\" -Recurse -Directory)",
+      "Bash(xargs grep -l \"AgentStep\\\\|StepResult\\\\|RecordStepExchange\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\" -Filter \"*Writer*\" -Recurse)",
+      "Bash(find /c/Users/ing_m -name \"*SessionWriter*\" -o -name \"*AgentAggregate*\" 2>/dev/null | head -5)",
+      "Read(//c/Users/ing_m/**)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Conversation\\\\StepConversation.cs\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\\\\src\\\\multy-agent\\\\src\\\\AgentFramework.Core\\\\Agent\\\\Conversation\\\\StepConversationLog.cs\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\ing_m\\\\OneDrive\\\\Coding\\\\Ai Agent Repos\\\\multy-agent-template-architecture\\\\multy-agent-template-architecture\" -Recurse -Filter \"*.sln\")",
+      "Bash(Select-Object -First 5)"
     ]
   }
 }

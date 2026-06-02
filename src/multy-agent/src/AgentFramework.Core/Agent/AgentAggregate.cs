@@ -1,17 +1,45 @@
-using AgentFramework.Core.Agent.Conversation;
+using AgentFramework.Core.Agent.Handlers;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
 
 namespace AgentFramework.Core.Agent;
 
+/// <summary>
+/// DDD Aggregate Root for a single agent instance.
+///
+/// <b>Architectural role (Domain-Driven Design):</b>
+/// The aggregate owns all state that must change together: the reasoning brain (islands, groups,
+/// decisions), the question lifecycle, the deliverable registry, and the iteration history.
+/// External code interacts through three interfaces that enforce invariants:
+/// <list type="bullet">
+///   <item><see cref="IAgentRunContext"/> — read-only view for handlers building prompts.</item>
+///   <item><see cref="ISessionWriter"/> — write façade for step results applying mutations.</item>
+///   <item><c>AgentAggregate</c> public API — orchestration entry points (<see cref="RunAsync"/>, etc.).</item>
+/// </list>
+///
+/// <b>Iteration lifecycle:</b>
+/// <code>
+/// 1. Construct via domain factory (e.g. UxAgent.BuildAsync)
+/// 2. RunAsync(userIntent, chatClient, deliverableWriter)
+///    ├─ Kickoff   → BeginIteration (creates Checkpoint, clears PendingRequest)
+///    ├─ Capture   → SetCapturedIslands
+///    ├─ Organize  → ApplyOrganization (groups + decisions)
+///    ├─ Distill   → ApplyDistillation (decisions + deliverables + questions)
+///    ├─ Express   → UpdateTokenConsumption + ReviewQuestion
+///    └─ Closed    → FinalizeSession (seals Checkpoint with ClosedAt)
+/// 3. PrepareNextIteration(answers?) → resets pipeline, applies answers
+/// 4. RunAsync again → Kickoff triages prior questions against new context
+/// </code>
+///
+/// <b>Interface delegation pattern:</b>
+/// The aggregate implements <see cref="ISessionWriter"/> and <see cref="IAgentRunContext"/> via
+/// explicit interface implementations. This hides the write façade from aggregate consumers
+/// (who only see the public orchestration API) while exposing it to <see cref="Steps.StepResult.ApplyTo"/>.
+/// </summary>
 public class AgentAggregate<TId> :
-    ISessionWriter,
-    ISessionObjectiveWriter,
-    ISessionBacklogWriter,
-    IQuestionWriter,
+    ISessionWriter,   // façade: IBrainWriter + IQuestionWriter + IDeliverableTracker + lifecycle
     ITokenConsumptionWriter,
     IAgentRunContext
 {
@@ -20,78 +48,65 @@ public class AgentAggregate<TId> :
 
     public AgentSession? Session { get; private set; }
 
-    private readonly StepConversationLog _stepConversations = new();
+    // Holds the AgentRequest for the current RunAsync call until BeginIteration consumes
+    // it into the new Checkpoint. Cleared immediately after BeginIteration fires.
+    private AgentRequest? _pendingRequest;
 
-    public IReadOnlyList<ChatMessage> ConversationMessages
-    {
-        get
-        {
-            var result = new List<ChatMessage>();
-            bool systemAdded = false;
-            foreach (var step in _stepConversations.Steps)
-            {
-                if (!systemAdded)
-                {
-                    var sys = step.Messages.FirstOrDefault(m => m.Role == MessageRole.System);
-                    if (sys is not null) { result.Add(sys); systemAdded = true; }
-                }
-                result.AddRange(step.Messages.Where(m => m.Role != MessageRole.System));
-                result.Add(new ChatMessage(MessageRole.Assistant, step.Response));
-            }
-            return result.AsReadOnly();
-        }
-    }
+    private readonly Dictionary<string, IReadOnlyList<HandlerExchange>> _stepJournals = new();
+
+    public IReadOnlyList<HandlerExchange> GetStepJournal(string stepName)
+        => _stepJournals.TryGetValue(stepName, out var j) ? j : [];
+
+    public IReadOnlyCollection<string> JournalStepNames => _stepJournals.Keys;
 
     public StepPipeline Pipeline { get; protected set; } = default!;
 
     public IReadOnlyList<AgentStep> Steps => Pipeline.Steps;
     public bool IsCompleted => Pipeline.IsCompleted;
 
-    // --- Domain outputs ---
+    // ── Domain outputs ────────────────────────────────────────────────────────
 
-    private readonly List<Question> _questions = [];
-    private readonly List<Decision> _decisions = [];
+    private readonly List<Question>    _questions    = [];
     private readonly List<Deliverable> _deliverables = [];
 
-    public IReadOnlyList<Question> Questions => _questions.AsReadOnly();
-    public IReadOnlyList<Decision> Decisions => _decisions.AsReadOnly();
+    public IReadOnlyList<Question>    Questions    => _questions.AsReadOnly();
     public IReadOnlyList<Deliverable> Deliverables => _deliverables.AsReadOnly();
 
+    /// <summary>
+    /// Decisions are owned by the brain — read directly from the session.
+    /// All reasoning decisions (organize + distill) are stored in <see cref="AgentBrain"/>.
+    /// </summary>
+    public IReadOnlyList<Decision> Decisions => Session?.Brain.Decisions ?? [];
 
     protected AgentAggregate() { }
 
-    public AgentAggregate(TId id, IStepPromptLayer agentPromptContext, string projectId, SessionMarkFilePaths markFilePaths)
+    public AgentAggregate(TId id, string projectId, IStepPromptLayer agentPromptContext)
     {
-        Id = id;
+        Id                     = id;
         RolePromptAgentContext = agentPromptContext;
-        Session = new AgentSession(projectId, markFilePaths);
+        Session                = new AgentSession(projectId);
     }
 
-    public void SetUserIntent(string intent) => Session?.SetUserIntent(intent);
+    // ── Question Queries ──────────────────────────────────────────────────────
 
-    // --- Question Queries ---
-
-    public IReadOnlyList<Question> GetQuestions()
-        => _questions.AsReadOnly();
+    public IReadOnlyList<Question> GetQuestions() => _questions.AsReadOnly();
 
     public IReadOnlyList<Question> GetQuestions(QuestionStatus status)
         => _questions.Where(q => q.Status == status).ToList().AsReadOnly();
 
-    public IReadOnlyList<Question> GetOpenQuestions()
-        => GetQuestions(QuestionStatus.Open);
-
-    public IReadOnlyList<Question> GetPendingReviewQuestions()
-        => GetQuestions(QuestionStatus.Answered);
+    public IReadOnlyList<Question> GetOpenQuestions()      => GetQuestions(QuestionStatus.Open);
+    public IReadOnlyList<Question> GetPendingReviewQuestions() => GetQuestions(QuestionStatus.Answered);
 
     public Question? FindQuestion(string id) => _questions.Find(q => q.Id == id);
 
+    // Convenience forwarders so subclasses can mutate questions without casting to ISessionWriter.
     public void RaiseQuestion(string id, string text, string source)
         => ((ISessionWriter)this).RaiseQuestion(id, text, source);
 
     public void ApplyQuestionReview(string id, QuestionStatus newStatus)
         => ((ISessionWriter)this).ReviewQuestion(id, newStatus);
 
-    // --- Supply Answers (between sessions) ---
+    // ── Supply Answers (between iterations) ───────────────────────────────────
 
     public void SupplyAnswers(IReadOnlyList<(string QuestionId, string Answer, string AnswerSource)> answers)
     {
@@ -103,66 +118,120 @@ public class AgentAggregate<TId> :
         }
     }
 
-    public async Task<StepResult> ExecuteNextStepAsync(
-        IChatClient chatClient,
+    // ── Multi-iteration ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Resets the pipeline to Step 1 so the agent can run another full 6-step cycle.
+    /// Must be called explicitly between runs — <see cref="RunAsync"/> throws if the pipeline
+    /// is already completed without this being called first.
+    /// Optionally supply answers to open questions before the next Kickoff triages them.
+    /// All prior checkpoints, brain state (islands/groups/decisions), deliverables, and
+    /// questions are preserved in memory and available as context for the next Kickoff.
+    /// </summary>
+    public void PrepareNextIteration(
+        IReadOnlyList<(string QuestionId, string Answer, string AnswerSource)>? answers = null)
+    {
+        if (!IsCompleted)
+            throw new InvalidOperationException(
+                "Cannot prepare next iteration: the current run is not yet complete.");
+
+        if (answers is not null) SupplyAnswers(answers);
+        Pipeline.Reset();
+    }
+
+    // ── Step execution ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Executes the next single step. For multi-step test sequences pass the
+    /// <see cref="AgentRequest"/> on the first call (Kickoff); subsequent calls
+    /// do not need it — the intent is consumed by the Kickoff step.
+    /// </summary>
+    public Task<StepResult> ExecuteNextStepAsync(
+        AgentRequest      request,
+        IChatClient       chatClient,
         CancellationToken ct = default)
+    {
+        _pendingRequest = request;
+        return ExecuteNextStepAsync(chatClient, ct);
+    }
+
+    /// <summary>
+    /// Executes the next single step using a request already set (by <see cref="RunAsync"/>
+    /// or by a prior call to the <see cref="ExecuteNextStepAsync(AgentRequest,IChatClient,CancellationToken)"/> overload).
+    /// </summary>
+    public Task<StepResult> ExecuteNextStepAsync(IChatClient chatClient, CancellationToken ct = default)
     {
         if (IsCompleted)
             throw new InvalidOperationException("All steps have been completed.");
+        return ExecuteCurrentStepAsync(chatClient, ct);
+    }
 
+    /// <summary>
+    /// Executes all pipeline steps in sequence. Use this overload in tests and non-production
+    /// flows where no <see cref="IDeliverableWriter"/> is needed.
+    /// Equivalent to <see cref="RunAsync"/> without the deliverable-writing side-effect.
+    /// </summary>
+    public Task<IReadOnlyList<StepResult>> ExecuteAllStepsAsync(
+        AgentRequest      request,
+        IChatClient       chatClient,
+        CancellationToken ct = default)
+    {
+        _pendingRequest = request;
+        return ExecuteAllStepsAsync(chatClient, ct);
+    }
+
+    /// <summary>
+    /// Executes all steps using a request already set (by <see cref="RunAsync"/> or the
+    /// <see cref="ExecuteAllStepsAsync(AgentRequest,IChatClient,CancellationToken)"/> overload).
+    /// </summary>
+    public async Task<IReadOnlyList<StepResult>> ExecuteAllStepsAsync(
+        IChatClient       chatClient,
+        CancellationToken ct = default)
+    {
+        var results = new List<StepResult>();
+        while (!IsCompleted)
+        {
+            results.Add(await ExecuteCurrentStepAsync(chatClient, ct));
+            if (!results[^1].GateSatisfied) break;
+        }
+        return results.AsReadOnly();
+    }
+
+    private async Task<StepResult> ExecuteCurrentStepAsync(IChatClient chatClient, CancellationToken ct)
+    {
         if (!Pipeline.TryGetCurrentStep(out var step))
             throw new InvalidOperationException("No current step available.");
 
         var result = await step!.ExecuteStepAsync(this, this, chatClient, ct);
         result!.ApplyTo(this);
-
-        if (result.GateSatisfied)
-            Pipeline.Advance();
-
+        if (result.GateSatisfied) Pipeline.Advance();
         return result;
     }
 
-    public async Task<IReadOnlyList<StepResult>> ExecuteAllStepsAsync(
-        IChatClient chatClient,
-        CancellationToken ct = default)
-    {
-        var results = new List<StepResult>();
-
-        while (!IsCompleted)
-        {
-            var result = await ExecuteNextStepAsync(chatClient, ct);
-            results.Add(result);
-
-            if (!result.GateSatisfied)
-                break;
-        }
-
-        return results.AsReadOnly();
-    }
-
     public async Task<AgentRunResult> RunAsync(
-        string userIntent,
-        IChatClient chatClient,
+        AgentRequest       request,
+        IChatClient        chatClient,
         IDeliverableWriter deliverableWriter,
-        CancellationToken ct = default)
+        CancellationToken  ct = default)
     {
-        Session?.SetUserIntent(userIntent);
+        if (IsCompleted)
+            throw new InvalidOperationException(
+                "Pipeline is completed. Call PrepareNextIteration() before running again.");
+
+        _pendingRequest = request;
 
         var results = new List<StepResult>();
-
         while (!IsCompleted)
         {
             var result = await ExecuteNextStepAsync(chatClient, ct);
             results.Add(result);
-
-            if (!result.GateSatisfied)
-                break;
+            if (!result.GateSatisfied) break;
         }
 
         await deliverableWriter.WriteAsync(this, results.AsReadOnly(), ct);
 
         return new AgentRunResult(
-            Session,
+            Session!,   // Session is set in constructor and never cleared
             results.AsReadOnly(),
             IsCompleted,
             Questions,
@@ -174,54 +243,72 @@ public class AgentAggregate<TId> :
     // IAgentRunContext
     // ==========================================================
 
-    AgentSession? IAgentRunContext.Session => Session;
-    IReadOnlyList<Question> IAgentRunContext.Questions => _questions.AsReadOnly();
-    IReadOnlyList<Decision> IAgentRunContext.Decisions => _decisions.AsReadOnly();
-    IReadOnlyList<Deliverable> IAgentRunContext.Deliverables => _deliverables.AsReadOnly();
-    IReadOnlyList<StepConversation> IAgentRunContext.StepConversations => _stepConversations.Steps;
+    AgentSession?              IAgentRunContext.Session           => Session;
+    IReadOnlyList<Question>    IAgentRunContext.Questions         => _questions.AsReadOnly();
+    IReadOnlyList<Decision>    IAgentRunContext.Decisions         => Session?.Brain.Decisions ?? [];
+    IReadOnlyList<Deliverable> IAgentRunContext.Deliverables      => _deliverables.AsReadOnly();
+    AgentRequest?              IAgentRunContext.PendingRequest    => _pendingRequest;
+
+    IReadOnlyList<HandlerExchange> IAgentRunContext.GetStepJournal(string stepName)
+        => _stepJournals.TryGetValue(stepName, out var j) ? j : [];
 
     // ==========================================================
-    // ISessionWriter
+    // ISessionWriter — lifecycle methods
     // ==========================================================
 
     void ISessionWriter.BeginIteration(string sessionObjective)
-        => Session?.BeginIteration(sessionObjective);
-
-    void ISessionWriter.UpdateObjective(string sessionObjective)
     {
-        Session?.UpdateObjective(sessionObjective);
+        Session?.BeginIteration(sessionObjective, _pendingRequest?.Intent ?? string.Empty);
+        _pendingRequest = null;
     }
 
-    void ISessionWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
-    {
-        Session?.Backlog.SetCaptured(islands);
-    }
-
-    void ISessionWriter.ApplyOrganization(IReadOnlyList<IslandOrganization> organizations, IReadOnlyList<DecisionRecord> decisions)
-    {
-        Session?.Backlog.ApplyOrganization(organizations);
-
-        foreach (var dec in decisions)
-            _decisions.Add(new Decision(dec.Id, dec.Description, dec.Impact));
-    }
-
-    void ISessionWriter.ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables)
-    {
-        Session?.Backlog.ApplyDistillation(distillations);
-
-        foreach (var del in deliverables)
-            _deliverables.Add(new Deliverable(del.DeliverableId, del.Path, del.Status));
-    }
+    void ISessionWriter.RecordStepJournal(int stepNumber, string stepName,
+        IReadOnlyList<HandlerExchange> journal)
+        => _stepJournals[stepName] = journal;
 
     void ISessionWriter.UpdateTokenConsumption(int inputTokens, int outputTokens)
     {
         Session?.UpdateTokenConsumption(inputTokens, outputTokens);
     }
 
-    void ISessionWriter.RecordStepExchange(int stepNumber, string stepName,
-        IReadOnlyList<ChatMessage> messages, string response)
-        => _stepConversations.Record(
-            new StepConversation(stepNumber, stepName, messages, response, DateTime.UtcNow));
+    void ISessionWriter.FinalizeSession(DateTime closedAt)
+    {
+        Session?.FinalizeSession(closedAt);
+    }
+
+    // ==========================================================
+    // IBrainWriter — delegates to Session.Brain
+    // ==========================================================
+
+    void IBrainWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
+        => Session?.Brain.SetCapturedIslands(islands);
+
+    void IBrainWriter.ApplyOrganization(
+        IReadOnlyList<IslandOrganization> organizations,
+        IReadOnlyList<DecisionRecord>     decisions,
+        IReadOnlyList<IslandGroup>        groups)
+        => Session?.Brain.ApplyOrganization(organizations, decisions, groups);
+
+    void IBrainWriter.ApplyDistillation(
+        IReadOnlyList<IslandDistillation>    distillations,
+        IReadOnlyList<GroupDistillationRecord> groupDistillations)
+        => Session?.Brain.ApplyDistillation(distillations, groupDistillations);
+
+    // ==========================================================
+    // IDeliverableTracker
+    // ==========================================================
+
+    void IDeliverableTracker.TrackDeliverables(
+        IReadOnlyList<DeliverableRecord>       deliverables,
+        IReadOnlyList<GroupDistillationRecord> groupDistillations)
+    {
+        foreach (var del in deliverables)
+            _deliverables.Add(new Deliverable(del.DeliverableId, del.Path, del.Status));
+
+        foreach (var grp in groupDistillations)
+            foreach (var del in grp.Deliverables)
+                _deliverables.Add(new Deliverable(del.DeliverableId, del.Path, del.Status, del.GroupId, del.Purpose));
+    }
 
     // ==========================================================
     // IQuestionWriter
@@ -231,24 +318,25 @@ public class AgentAggregate<TId> :
     {
         if (FindQuestion(id) is not null)
             throw new InvalidOperationException($"Question '{id}' already exists.");
-
         _questions.Add(new Question(id, text, source));
     }
 
-    void IQuestionWriter.ReviewQuestion(string id, QuestionStatus newStatus)
+    void IQuestionWriter.ReviewQuestion(string id, QuestionStatus newStatus, string text)
     {
         var existing = FindQuestion(id);
         if (existing is not null)
         {
             switch (newStatus)
             {
-                case QuestionStatus.Reviewed: existing.MarkReviewed(); break;
+                case QuestionStatus.Reviewed:
+                    if (existing.Status == QuestionStatus.Answered) existing.MarkReviewed();
+                    break;
                 case QuestionStatus.Obsolete: existing.MarkObsolete(); break;
             }
         }
         else if (newStatus == QuestionStatus.Open)
         {
-            _questions.Add(new Question(id, string.Empty, "express-relay"));
+            _questions.Add(new Question(id, text, "express-relay"));
         }
     }
 
@@ -256,22 +344,17 @@ public class AgentAggregate<TId> :
         string? answer, string? answerSource)
     {
         if (FindQuestion(id) is not null) return;
-
         var question = new Question(id, text, source);
         _questions.Add(question);
-
         switch (status)
         {
             case QuestionStatus.Answered:
-                question.SetAnswer(answer ?? "restored", answerSource ?? "restored");
-                break;
+                question.SetAnswer(answer ?? "restored", answerSource ?? "restored"); break;
             case QuestionStatus.Reviewed:
                 question.SetAnswer(answer ?? "restored", answerSource ?? "restored");
-                question.MarkReviewed();
-                break;
+                question.MarkReviewed(); break;
             case QuestionStatus.Obsolete:
-                question.MarkObsolete();
-                break;
+                question.MarkObsolete(); break;
         }
     }
 
@@ -283,20 +366,8 @@ public class AgentAggregate<TId> :
     }
 
     // ==========================================================
-    // Sub-interface forwarding
+    // ITokenConsumptionWriter — forwarding
     // ==========================================================
-
-    void ISessionObjectiveWriter.UpdateObjective(string sessionObjective)
-        => ((ISessionWriter)this).UpdateObjective(sessionObjective);
-
-    void ISessionBacklogWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
-        => ((ISessionWriter)this).SetCapturedIslands(islands);
-
-    void ISessionBacklogWriter.ApplyOrganization(IReadOnlyList<IslandOrganization> organizations, IReadOnlyList<DecisionRecord> decisions)
-        => ((ISessionWriter)this).ApplyOrganization(organizations, decisions);
-
-    void ISessionBacklogWriter.ApplyDistillation(IReadOnlyList<IslandDistillation> distillations, IReadOnlyList<DeliverableRecord> deliverables)
-        => ((ISessionWriter)this).ApplyDistillation(distillations, deliverables);
 
     void ITokenConsumptionWriter.UpdateTokenConsumption(int inputTokens, int outputTokens)
         => ((ISessionWriter)this).UpdateTokenConsumption(inputTokens, outputTokens);

@@ -4,29 +4,25 @@ using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 public class StepPipelineTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
-    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static async Task<UxPersona> CreateAgentAsync()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        var config = TestSteps.DefaultUxConfig(role);
-        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     [Fact]
-    public async Task UxPersona_Has5Steps()
+    public async Task UxAgent_Has6Steps()
     {
         var agent = await CreateAgentAsync();
-        Assert.Equal(5, agent.Steps.Count);
+        Assert.Equal(6, agent.Steps.Count);
     }
 
     [Fact]
@@ -40,18 +36,19 @@ public class StepPipelineTests
     }
 
     [Fact]
-    public async Task Step1_UsesKickoffext()
+    public async Task Step1_UsesKickoffContext()
     {
         var agent = await CreateAgentAsync();
-        Assert.Equal("Kickoff-context", agent.Steps[0].SkillName);
+        Assert.Contains("Kickoff-context", agent.Steps[0].SkillNames);
         Assert.Equal("Objective confirmed", agent.Steps[0].Gate.Description);
     }
 
     [Fact]
-    public async Task Step2_UsesAutonomousCapture()
+    public async Task Step2_UsesSixThinkingHatsAndCaptureStrict()
     {
         var agent = await CreateAgentAsync();
-        Assert.Equal("autonomous-capture", agent.Steps[1].SkillName);
+        Assert.Contains("six-thinking-hats",     agent.Steps[1].SkillNames);
+        Assert.Contains("capture-strict-islands", agent.Steps[1].SkillNames);
         Assert.Equal("≥3 user-type islands", agent.Steps[1].Gate.Description);
     }
 
@@ -93,9 +90,9 @@ public class StepPipelineTests
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
 
-        var results = await agent.ExecuteAllStepsAsync(client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
-        Assert.Equal(5, results.Count);
+        Assert.Equal(6, results.Count);
         Assert.True(agent.IsCompleted);
         Assert.All(results, r => Assert.True(r.GateSatisfied));
     }
@@ -106,7 +103,7 @@ public class StepPipelineTests
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient(failAtStep: 3);
 
-        var results = await agent.ExecuteAllStepsAsync(client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
         Assert.Equal(3, results.Count);
         Assert.False(agent.IsCompleted);
@@ -118,7 +115,7 @@ public class StepPipelineTests
     {
         var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
-        await agent.ExecuteAllStepsAsync(client);
+        await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => agent.ExecuteNextStepAsync(client));
@@ -140,9 +137,34 @@ public class StepPipelineTests
             Func<JsonElement, TResult> parse, CancellationToken ct = default)
         {
             var passed = _failAtStep == 1 ? false : _gateSatisfied;
-            var json = jsonSchema.Contains("triaged")
-                ? """{"triaged":[]}"""
-                : $$"""{"sessionObjective":"Build personas for recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":{{(passed ? "true" : "false")}}}""";
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[]}""";
+            else if (jsonSchema.Contains("groupDistillations"))
+            {
+                var distillPassed = _failAtStep != 4 && _gateSatisfied;
+                json = distillPassed
+                    ? """{"groupDistillations":[{"groupId":"GRP-001","decisions":[{"id":"DEC-001","description":"Merge pain into athlete persona","impact":"Cleaner model"}],"deliverables":[{"deliverableId":"DEL-001","path":"outputs/personas/01-athlete.md","purpose":"Athlete card","status":"Complete"}],"questions":[]}],"distilledIslands":[{"islandId":"ISL-001","newStatus":"Distilled"},{"islandId":"ISL-002","newStatus":"Distilled"}],"gateSatisfied":true}"""
+                    : """{"groupDistillations":[],"distilledIslands":[],"gateSatisfied":false}""";
+            }
+            else if (jsonSchema.Contains("readiness"))
+            {
+                // Fail gate for step 3 when failAtStep==3: return Blocked (gate = ≥1 non-blocked group)
+                var readiness = (_failAtStep == 3 || !_gateSatisfied) ? "Blocked" : "Ready";
+                json = $$"""{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting","readiness":"{{readiness}}","readinessNotes":null}]}""";
+            }
+            else if (jsonSchema.Contains("islandIds"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting"}],"ungroupedIslandIds":["ISL-003"]}""";
+            else if (jsonSchema.Contains("islands"))
+                json = """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete","source":"six-hats:yellow","relatesToIslandId":null},{"id":"ISL-002","type":"Stakeholder","description":"College coach","source":"six-hats:white","relatesToIslandId":null},{"id":"ISL-003","type":"PainPoint","description":"No visibility","source":"six-hats:black","relatesToIslandId":"ISL-001"}]}""";
+            // UxExpress content handlers — LLM returns HTML directly
+            else if (jsonSchema.Contains("\"html\""))
+                json = """{"html":"<html><body>Test Document</body></html>"}""";
+            // UxQuestionReviewHandler — tokens + question statuses
+            else if (jsonSchema.Contains("inputTokens"))
+                json = """{"questions":[],"inputTokens":0,"outputTokens":0,"gateSatisfied":true}""";
+            else
+                json = $$"""{"sessionObjective":"Build personas for recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":{{(passed ? "true" : "false")}}}""";
             return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
         }
 

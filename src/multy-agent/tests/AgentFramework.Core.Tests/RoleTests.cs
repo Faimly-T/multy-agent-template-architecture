@@ -5,7 +5,7 @@ namespace AgentFramework.Core.Tests;
 
 public class RoleTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
     private static RoleDefinition LoadRole()
     {

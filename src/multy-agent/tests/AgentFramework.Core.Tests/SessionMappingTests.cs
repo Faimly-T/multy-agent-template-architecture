@@ -3,7 +3,7 @@ using AgentFramework.Core.Agent.Conversation;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Core.Agent;
 using AgentFramework.Domain.UxAgent;
 
@@ -11,15 +11,11 @@ namespace AgentFramework.Core.Tests;
 
 public class SessionMappingTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
-    private static readonly SessionMarkFilePaths TestMarkFilePaths = new("UX", "outputs/contextAgent");
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static async Task<UxPersona> CreateAgentAsync()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        var role = RoleParser.ParseFromMarkdown(markdown);
-        var config = TestSteps.DefaultUxConfig(role);
-        return await UxPersona.BuildAsync(config, TestSteps.DefaultPipelineCode());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     // --- Step 1: Kickoff → maps Session Objective ---
@@ -85,13 +81,16 @@ public class SessionMappingTests
     [Fact]
     public async Task Step3_OrganizeResult_RecordsDecisions()
     {
+        // Decisions are now produced by the Distill step (step 4) via group distillations.
         var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteNextStepAsync(client);
-        await agent.ExecuteNextStepAsync(client);
-        await agent.ExecuteNextStepAsync(client);
+        await agent.ExecuteNextStepAsync(client); // step 1: kickoff
+        await agent.ExecuteNextStepAsync(client); // step 2: capture
+        await agent.ExecuteNextStepAsync(client); // step 3: organize — no decisions yet
+        Assert.Empty(agent.Decisions);
 
+        await agent.ExecuteNextStepAsync(client); // step 4: distill — decisions appear here
         Assert.Single(agent.Decisions);
         Assert.Equal("DEC-001", agent.Decisions[0].Id);
         Assert.Equal("Merge pain-point island into athlete persona", agent.Decisions[0].Description);
@@ -126,7 +125,7 @@ public class SessionMappingTests
         var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
-        await agent.ExecuteAllStepsAsync(client);
+        await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
         Assert.True(agent.IsCompleted);
         Assert.Equal(2000, agent.Session!.CurrentCheckpoint!.TokensConsumption.InputTokens);
@@ -142,9 +141,9 @@ public class SessionMappingTests
         var agent = await CreateAgentAsync();
         var client = new PhaseAwareChatClient();
 
-        var results = await agent.ExecuteAllStepsAsync(client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
-        Assert.Equal(5, results.Count);
+        Assert.Equal(6, results.Count);
         Assert.True(agent.IsCompleted);
 
         Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
@@ -177,9 +176,23 @@ public class SessionMappingTests
             IReadOnlyList<ChatMessage> messages, string jsonSchema,
             Func<JsonElement, TResult> parse, CancellationToken ct = default)
         {
-            var json = jsonSchema.Contains("triaged")
-                ? """{"triaged":[]}"""
-                : """{"sessionObjective":"Build personas for a college athletic recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[]}""";
+            else if (jsonSchema.Contains("groupDistillations"))
+                json = """{"groupDistillations":[{"groupId":"GRP-001","decisions":[{"id":"DEC-001","description":"Merge pain-point island into athlete persona","impact":"Reduces persona count"}],"deliverables":[{"deliverableId":"DEL-001","path":"outputs/personas/01-athlete.md","purpose":"Athlete persona card","status":"Complete"}],"questions":[]}],"distilledIslands":[{"islandId":"ISL-001","newStatus":"Distilled"},{"islandId":"ISL-002","newStatus":"Distilled"}],"gateSatisfied":true}""";
+            else if (jsonSchema.Contains("readiness"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe the recruiting relationship","readiness":"Ready","readinessNotes":null}]}""";
+            else if (jsonSchema.Contains("islandIds"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe the recruiting relationship"}],"ungroupedIslandIds":["ISL-003"]}""";
+            else if (jsonSchema.Contains("islands"))
+                json = """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete seeking recruitment","source":"six-hats:yellow","relatesToIslandId":null},{"id":"ISL-002","type":"Stakeholder","description":"College coach evaluating talent","source":"six-hats:white","relatesToIslandId":null},{"id":"ISL-003","type":"PainPoint","description":"No visibility into recruiting process","source":"six-hats:black","relatesToIslandId":"ISL-001"}]}""";
+            else if (jsonSchema.Contains("\"html\""))
+                json = """{"html":"<html><body>Test Document</body></html>"}""";
+            else if (jsonSchema.Contains("inputTokens"))
+                json = """{"questions":[],"inputTokens":2000,"outputTokens":5000,"gateSatisfied":true}""";
+            else
+                json = """{"sessionObjective":"Build personas for a college athletic recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":true}""";
             return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
         }
 

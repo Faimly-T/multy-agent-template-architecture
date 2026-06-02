@@ -43,4 +43,10 @@ public class StepPipeline
 
         CurrentStepIndex++;
     }
+
+    /// <summary>
+    /// Resets the pipeline to Step 1 so the agent can run another full iteration.
+    /// Only called by <see cref="AgentAggregate{TId}.PrepareNextIteration"/>.
+    /// </summary>
+    internal void Reset() => CurrentStepIndex = 0;
 }
