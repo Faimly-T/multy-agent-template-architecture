@@ -1,200 +1,120 @@
+using System.Text.Json;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
-using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 public class ConversationPipelineTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
-    // --- Step 1: First interaction builds system + user messages ---
+    // --- Step 1: journal is recorded after execution ---
 
     [Fact]
-    public async Task Step1_BuildsSystemPromptWithRole_OnFirstInteraction()
+    public async Task Step1_JournalIsRecorded()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
 
-        // System message is first in conversation
-        Assert.Equal(MessageRole.System, agent.ConversationMessages[0].Role);
-        Assert.Contains("Clara Mendes", agent.ConversationMessages[0].Content);
-        Assert.Contains("Senior UX Researcher", agent.ConversationMessages[0].Content);
+        Assert.NotEmpty(agent.GetStepJournal("KickoffStep"));
     }
 
     [Fact]
-    public async Task Step1_BuildsUserPromptWithStepInstructions()
+    public async Task Step1_JournalOutputContainsFinalJson()
     {
-        var agent = CreateAgent();
-        agent.StartSession("Build personas for recruiting app");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
 
-        // User message is second in conversation
-        Assert.Equal(MessageRole.User, agent.ConversationMessages[1].Role);
-        Assert.Contains("Define objective for agent", agent.ConversationMessages[1].Content);
-        Assert.Contains("Build personas for recruiting app", agent.ConversationMessages[1].Content);
-    }
-
-    [Fact]
-    public async Task Step1_AssistantResponseIsRecorded()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(builder, client);
-
-        // Assistant response is third
-        Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
-        Assert.Equal("Objective defined", agent.ConversationMessages[2].Content);
+        var output = agent.GetStepJournal("KickoffStep")[^1].Content.Output;
+        Assert.Contains("sessionObjective", output);
     }
 
     [Fact]
     public async Task Step1_MapsObjectiveToSession()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
 
-        Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.Checkpoint.SessionObjective);
+        Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
     }
 
-    // --- Step 2: Conversation accumulates ---
+    // --- Step 2: both step journals recorded ---
 
     [Fact]
-    public async Task Step2_DoesNotDuplicateSystemPrompt()
+    public async Task Step2_BothStepJournalsRecorded()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client); // Step 1
-        await agent.ExecuteNextStepAsync(builder, client); // Step 2
+        await agent.ExecuteNextStepAsync(client); // Step 1
+        await agent.ExecuteNextStepAsync(client); // Step 2
 
-        var systemMessages = agent.ConversationMessages.Where(m => m.Role == MessageRole.System).ToList();
-        Assert.Single(systemMessages);
-    }
-
-    [Fact]
-    public async Task Step2_ConversationHasFullHistory()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(builder, client); // Step 1: system + user + assistant
-        await agent.ExecuteNextStepAsync(builder, client); // Step 2: user + assistant
-
-        // system(1) + user(1) + assistant(1) + user(2) + assistant(2) = 5
-        Assert.Equal(5, agent.ConversationMessages.Count);
+        Assert.NotEmpty(agent.GetStepJournal("KickoffStep"));
+        Assert.NotEmpty(agent.GetStepJournal("CaptureStep"));
     }
 
     [Fact]
     public async Task Step2_SendsFullHistoryToChatClient()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        await agent.ExecuteNextStepAsync(builder, client);
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
+        await agent.ExecuteNextStepAsync(client);
 
-        // The client received all messages accumulated so far when step 2 was called
-        Assert.True(client.LastReceivedMessageCount >= 4); // system + user1 + assistant1 + user2
-    }
-
-    [Fact]
-    public async Task Step2_UserPromptIncludesSessionObjective()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(builder, client); // Step 1
-        await agent.ExecuteNextStepAsync(builder, client); // Step 2
-
-        // Step 2 user message (index 3) should reference the objective set in step 1
-        var step2UserMsg = agent.ConversationMessages[3];
-        Assert.Contains("Build personas for college athletic recruiting platform", step2UserMsg.Content);
-    }
-
-    // --- Domain events still raised ---
-
-    [Fact]
-    public async Task ConversationPipeline_RaisesDomainEvents()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient();
-
-        await agent.ExecuteNextStepAsync(builder, client);
-
-        Assert.Equal(2, agent.DomainEvents.Count);
-        Assert.IsType<StepStarted>(agent.DomainEvents[0]);
-        Assert.IsType<StepCompleted>(agent.DomainEvents[1]);
+        Assert.True(client.LastReceivedMessageCount >= 2);
     }
 
     // --- Gate failure ---
 
     [Fact]
-    public async Task ConversationPipeline_GateFailed_StillRecordsAssistantMessage()
+    public async Task GateFailed_JournalStillRecorded()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(failGate: true);
 
-        await agent.ExecuteNextStepAsync(builder, client);
+        await agent.ExecuteNextStepAsync(client);
 
-        // Assistant message is still recorded even on failure
-        Assert.Equal(3, agent.ConversationMessages.Count);
-        Assert.Equal(MessageRole.Assistant, agent.ConversationMessages[2].Role);
+        Assert.NotEmpty(agent.GetStepJournal("KickoffStep"));
         Assert.Equal(0, agent.Pipeline.CurrentStepIndex); // did not advance
     }
 
     // --- Full pipeline ---
 
     [Fact]
-    public async Task FullPipeline_AccumulatesConversation()
+    public async Task FullPipeline_AllStepJournalsRecorded()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient();
 
-        var results = await agent.ExecuteAllStepsAsync(builder, client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
-        Assert.Equal(5, results.Count);
+        Assert.Equal(6, results.Count);
         Assert.True(agent.IsCompleted);
-        // system(1) + 5*(user + assistant) = 11
-        Assert.Equal(11, agent.ConversationMessages.Count);
+        Assert.NotEmpty(agent.GetStepJournal("KickoffStep"));
+        Assert.NotEmpty(agent.GetStepJournal("CaptureStep"));
+        Assert.NotEmpty(agent.GetStepJournal("OrganizeStep"));
+        Assert.NotEmpty(agent.GetStepJournal("DistillStep"));
+        // Verify all 6 step journals were recorded using the actual step names
+        Assert.Equal(6, agent.JournalStepNames.Count);
+        Assert.NotEmpty(agent.GetStepJournal("ClosedStep"));
     }
 
     // --- Fake chat client ---
@@ -209,13 +129,43 @@ public class ConversationPipelineTests
             _failGate = failGate;
         }
 
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            LastReceivedMessageCount = messages.Count;
+            var passed = !_failGate;
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[]}""";
+            else if (jsonSchema.Contains("groupDistillations"))
+                json = passed
+                    ? """{"groupDistillations":[{"groupId":"GRP-001","decisions":[{"id":"DEC-001","description":"Merge pain into athlete persona","impact":"Cleaner model"}],"deliverables":[{"deliverableId":"DEL-001","path":"outputs/personas/01-athlete.md","purpose":"Athlete card","status":"Complete"}],"questions":[]}],"distilledIslands":[{"islandId":"ISL-001","newStatus":"Distilled"},{"islandId":"ISL-002","newStatus":"Distilled"}],"gateSatisfied":true}"""
+                    : """{"groupDistillations":[],"distilledIslands":[],"gateSatisfied":false}""";
+            else if (jsonSchema.Contains("readiness"))
+                json = passed
+                    ? """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting","readiness":"Ready","readinessNotes":null}]}"""
+                    : """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting","readiness":"NeedsCapture","readinessNotes":null}]}""";
+            else if (jsonSchema.Contains("islandIds"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting"}],"ungroupedIslandIds":["ISL-003"]}""";
+            else if (jsonSchema.Contains("islands"))
+                json = """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete seeking recruitment","source":"six-hats:yellow","relatesToIslandId":null},{"id":"ISL-002","type":"Stakeholder","description":"College coach evaluating talent","source":"six-hats:white","relatesToIslandId":null},{"id":"ISL-003","type":"PainPoint","description":"No visibility into recruiting process","source":"six-hats:black","relatesToIslandId":"ISL-001"}]}""";
+            else if (jsonSchema.Contains("\"html\""))
+                json = """{"html":"<html><body>Test Document</body></html>"}""";
+            else if (jsonSchema.Contains("inputTokens"))
+                json = """{"questions":[],"inputTokens":0,"outputTokens":0,"gateSatisfied":true}""";
+            else
+                json = $$"""{"sessionObjective":"Build personas for college athletic recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":{{(passed ? "true" : "false")}}}""";
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
+
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
             LastReceivedMessageCount = messages.Count;
 
             StepResult result = step.StepNumber switch
             {
-                1 => new RehydrateResult(
+                1 => new KickoffResult(
                     Output: "Objective defined",
                     GateSatisfied: !_failGate,
                     SessionObjective: "Build personas for college athletic recruiting platform"),

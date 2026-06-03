@@ -94,4 +94,4 @@ Skill filenames follow the pattern: `[agent-prefix]-[verb]-[object]`
 | Product Owner | `po` | `po-prioritize-backlog` |
 | Project Manager | `pjm` | `pjm-produce-status-report` |
 | Architect | `arch` | `arch-evaluate-trade-offs` |
-| Any Agent (shared) | `shared` | `shared-rehydrate-context` |
+| Any Agent (shared) | `shared` | `shared-Kickoff-context` |

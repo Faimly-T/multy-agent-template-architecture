@@ -75,7 +75,7 @@ The **critical boundary** is between Phase 2 and Phase 3: the system shifts from
    │   Agents     │        │    Skills     │        │  Persistence │
    │  (Domain)    │        │ (Mechanics)   │        │ (MARK Files) │
    ├─────────────┤        ├──────────────┤        ├──────────────┤
-   │ UX Persona  │──uses──│ rehydrate    │──r/w──▶│ Progress     │
+   │ UX Persona  │──uses──│ Kickoff    │──r/w──▶│ Progress     │
    │ UX Journey  │──uses──│ capture      │        │ Summary MARK │
    │ Quest Intrvw│──uses──│ organize     │        │ Questions    │
    │ Prod Owner* │        │ distill      │        │ Log MARK     │
@@ -123,7 +123,7 @@ Every CODE-upgraded agent executes these 5 phases in strict order. No phase is s
 
 ### Phase Details
 
-#### Phase 1: Re-Hydrate (`rehydrate-context`)
+#### Phase 1: Re-Hydrate (`Kickoff-context`)
 - **Input**: MARK files from previous session + user input
 - **Process**: Read Progress Summary, read Questions Log, parse user intent, staleness check (>3 days warning), triage open questions, synthesize Session Objective
 - **Session Objective formula**: `verb + deliverable + success condition + stakes`
@@ -207,7 +207,7 @@ Legacy agents use traditional role-based prompting without the 5-Phase Relay. Th
 **Load role**: Read agent's configured role file (from .claude/settings.json)
 
 ### Steps
-1. **Define objective for agent** with `rehydrate-context` -> [domain input]. Gate: ...
+1. **Define objective for agent** with `Kickoff-context` -> [domain input]. Gate: ...
 2. **Generate unfiltered Island Backlog** with `autonomous-capture` -- hunt for: [targets]. Gate: ...
 3. **Map, group, and sequence the Island Backlog** with `strategic-organize` -- [clustering]. Gate: ...
 4. **Distill each island into a concrete result** with `expert-distill` -- produce [artifacts]. Gate: ...
@@ -234,7 +234,7 @@ Skills are **lazy-loaded** -- agents read each skill file ONLY when entering tha
 
 | Skill | Phase | Mode | Purpose | Key Output |
 |-------|-------|------|---------|------------|
-| `rehydrate-context` | 1 | Entry | Reconstruct session, set objective | Session Objective |
+| `Kickoff-context` | 1 | Entry | Reconstruct session, set objective | Session Objective |
 | `autonomous-capture` | 2 | Divergent | Generate unfiltered ideas | Island Backlog |
 | `strategic-organize` | 3 | Convergent | Structure and sequence | Execution Roadmap |
 | `expert-distill` | 4 | Convergent | Produce concrete results | Results Ledger + Artifacts |
@@ -488,7 +488,7 @@ project-root/
 │   │       └── AGENT-TEMPLATE.md          # Blueprint for new agents
 │   │
 │   └── skills/
-│       ├── rehydrate-context/
+│       ├── Kickoff-context/
 │       │   ├── SKILL.md
 │       │   └── templates/                 # MARK file + objective templates
 │       ├── autonomous-capture/SKILL.md
@@ -645,7 +645,7 @@ The key patterns to preserve:
 
 At minimum, you need:
 - 1 agent AGENT.md with 5 steps
-- 5 skill SKILL.md files (rehydrate, capture, organize, distill, relay)
+- 5 skill SKILL.md files (Kickoff, capture, organize, distill, relay)
 - 2 MARK files (Progress Summary, Questions Log)
 - 1 output folder
 - 1 settings registry

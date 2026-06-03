@@ -1,47 +1,71 @@
+using AgentFramework.CodePipeline;
+using AgentFramework.Core.Agent;
+using AgentFramework.Core.Agent.Ports;
+using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.Core.Tests.TestHelpers;
 using AgentFramework.Domain.UxAgent;
+using AgentFramework.Infrastructure.Repositories;
 
 namespace AgentFramework.Core.Tests;
 
 internal static class TestSteps
 {
-    public static StepPipeline DefaultPipeline() =>
-        UxStepBuilder.Create().WithSteps(DefaultSteps()).WithSkills(DefaultSkills()).Build();
+    private const string SkillsBasePath  = "TestData/Skills";
+    private const string RolePath        = "TestData/UxAgentRole.md";
+    private const string AgentConfigPath = "TestData/ux-agent-config.json";
 
-    public static IEnumerable<Skill> DefaultSkills() =>
-        DefaultSteps().Select(s => SkillParser.ParseFromMarkdown(File.ReadAllText($"TestData/Skills/{s.SkillName}.md")));
+    // ── Intent constants ──────────────────────────────────────────────────────
 
-    public static AgentStep[] DefaultSteps() =>
-    [
-        new RehydrateStep(
-            stepNumber: 1,
-            name: "Define objective for agent",
-            instructions: "Session Objective. Parse product description.",
-            gate: new Gate("Objective confirmed")),
+    /// <summary>General-purpose intent for pipeline tests that don't target a specific scenario.</summary>
+    public const string DefaultIntent =
+        "Build buyer personas for a college athletic recruiting platform.";
 
-        new CaptureStep(
-            stepNumber: 2,
-            name: "Generate unfiltered Island Backlog",
-            instructions: "Hunt for: user types (direct + indirect) · goals & motivations · pain points · behavioral patterns · context of use (where/when/device) · emotional states · anti-users · stakeholders · accessibility signals.",
-            gate: new Gate("≥3 user-type islands")),
+    /// <summary>Scholarship scenario intent used by <c>PersonaWorkshopPipelineTests</c>.</summary>
+    public const string ScholarshipIntent =
+        "I want to build a system to search and profile potential leads for athlete student scholarships.";
 
-        new OrganizeStep(
-            stepNumber: 3,
-            name: "Map, group, and sequence the Island Backlog",
-            instructions: "Cluster by person → proto-persona. Within each: goals > pains > behaviors > context. Merge clusters yielding identical design decisions. Classify: Primary / Secondary / Anti-persona.",
-            gate: new Gate("2-5 ranked candidates")),
+    // ── Skill resolver ────────────────────────────────────────────────────────
 
-        new DistillStep(
-            stepNumber: 4,
-            name: "Distill each island into a concrete result",
-            instructions: "Produce Persona Cards per agent's configured template. Behavioral over demographic. JTBD: \"When [situation], I want to [motivation], so I can [outcome]\". Each persona ≥1 usage scenario. Progressive Summarization — scannable in 30s.",
-            gate: new Gate("All → Card or Concern")),
+    /// <summary>Flat-file skill resolver pointing at the test data Skills folder.</summary>
+    public static ISkillResolver DefaultResolver() => new FlatFileSkillResolver(SkillsBasePath);
 
-        new ExpressStep(
-            stepNumber: 5,
-            name: "Compile session state and emit",
-            instructions: "Write cards to agent's configured output folder. Emit relay. Record token usage in session checkpoint.",
-            gate: new Gate("Session + Cards + Relay + Token Usage logged"))
-    ];
+    // ── Repository ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// JSON-file repository that loads agent config and handler instructions from
+    /// <c>TestData/ux-agent-config.json</c>. Use with
+    /// <c>UxAgent.BuildAsync(config, resolver, repo)</c> to exercise the full repository path.
+    /// </summary>
+    public static IUxAgentRepository DefaultRepository() =>
+        new JsonUxAgentRepository(AgentConfigPath);
+
+    // ── Role helper ───────────────────────────────────────────────────────────
+
+    /// <summary>Parses the default test role from markdown.</summary>
+    public static RoleDefinition DefaultRole() =>
+        RoleParser.ParseFromMarkdown(File.ReadAllText(RolePath));
+
+    // ── Config DTO (for the config-driven / integration path) ─────────────────
+
+    public static AgentConfig DefaultUxConfig(RoleDefinition role) =>
+        UxAgentDefaults.Config(role);
+
+    // ── Raw steps (for unit tests that construct steps directly) ─────────────
+
+    public static AgentStep[] DefaultSteps(IStepPromptLayer? stepContext = null)
+    {
+        var ctx = stepContext ?? PromptContext.Empty;
+        return
+        [
+            new KickoffStep(ctx, 1, "Session Objective. Parse product description.",          new Gate("Objective confirmed")),
+            new CaptureStep(ctx, 2, "Hunt for user types · goals · pain points · patterns.",  new Gate("≥3 user-type islands")),
+            new OrganizeStep(ctx, 3, "Cluster by person → proto-persona.",                    new Gate("2-5 ranked candidates")),
+            new DistillStep(ctx,  4, "Produce Persona Cards per template. JTBD for each.",    new Gate("All → Card or Concern")),
+            new ExpressStep(ctx,  5, "Write cards. Emit relay. Record token usage.",           new Gate("Session + Cards logged")),
+        ];
+    }
+
+    public static StepPipeline DefaultPipeline(IStepPromptLayer? stepContext = null) =>
+        new StepPipeline(DefaultSteps(stepContext));
 }

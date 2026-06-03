@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AgentFramework.Core.Tests" />
     <InternalsVisibleTo Include="AgentFramework.Domain" />
+    <InternalsVisibleTo Include="AgentFramework.CodePipeline" />
   </ItemGroup>
 
 </Project>

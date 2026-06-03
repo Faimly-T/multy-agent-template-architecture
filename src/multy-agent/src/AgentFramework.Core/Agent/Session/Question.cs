@@ -1,5 +1,16 @@
  namespace AgentFramework.Core.Agent.Session;
 
+/// <summary>
+/// An open question raised by the agent during the Distill or Express step.
+///
+/// Questions are the agent's mechanism for surfacing uncertainty — they capture what is unknown
+/// or unvalidated so a human (or a downstream agent) can supply answers between iterations.
+/// Each iteration's Kickoff step triages all open questions against new context: resolved ones
+/// become <see cref="QuestionStatus.Answered"/>, irrelevant ones become
+/// <see cref="QuestionStatus.Obsolete"/>, and the remainder carry forward unchanged.
+///
+/// State machine: Open → Answered → Reviewed  (or → Obsolete from any state)
+/// </summary>
 public sealed class Question
 {
     public string Id { get; }

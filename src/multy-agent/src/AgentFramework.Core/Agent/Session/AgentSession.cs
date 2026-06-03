@@ -2,80 +2,54 @@ namespace AgentFramework.Core.Agent.Session;
 
 public class AgentSession
 {
-    public Checkpoint Checkpoint { get; private set; }
+    public string ProjectId { get; private set; }
 
-    public IslandBacklog Backlog { get; } = new();
+    private readonly List<Checkpoint> _checkpoints = [];
+    public IReadOnlyList<Checkpoint> Checkpoints => _checkpoints.AsReadOnly();
+    public Checkpoint? CurrentCheckpoint => _checkpoints.Count > 0 ? _checkpoints[^1] : null;
 
-    // Convenience accessor — delegates to Backlog for backward-compatible reads
-    public IReadOnlyList<Island> Islands => Backlog.All;
+    /// <summary>
+    /// The agent's reasoning state — all captured islands, semantic groups, and decisions
+    /// made throughout the pipeline run. See <see cref="AgentBrain"/> for details.
+    /// </summary>
+    public AgentBrain Brain { get; } = new();
 
-    private readonly List<Deliverable> _deliverables = [];
-    public IReadOnlyList<Deliverable> Deliverables => _deliverables.AsReadOnly();
+    // Convenience delegates into Brain for handlers that read islands/groups directly off the session.
+    public IReadOnlyList<Island>      Islands => Brain.Backlog.All;
+    public IslandBacklog              Backlog => Brain.Backlog;
+    public IReadOnlyList<IslandGroup> Groups  => Brain.Groups;
 
-    private readonly List<Decision> _decisions = [];
-    public IReadOnlyList<Decision> Decisions => _decisions.AsReadOnly();
-
-    private readonly List<Question> _questions = [];
-    public IReadOnlyList<Question> Questions => _questions.AsReadOnly();
-
-    public AgentSession(string sessionObjective, int sessionIteration = 1)
+    public AgentSession(string projectId)
     {
-        Checkpoint = new Checkpoint(
-            Date: DateTime.UtcNow,
-            SessionIteration: sessionIteration,
-            SessionObjective: sessionObjective,
-            TokensConsumption: new TokenConsumption(0, 0));
+        ProjectId = projectId;
     }
 
-    // --- Checkpoint ---
+    // --- Iteration lifecycle ---
 
-    internal void UpdateObjective(string sessionObjective)
+    internal Checkpoint BeginIteration(string sessionObjective, string userIntent)
     {
-        Checkpoint = Checkpoint with { SessionObjective = sessionObjective };
+        var cp = new Checkpoint(
+            SessionIteration:  _checkpoints.Count + 1,
+            CreatedAt:         DateTime.UtcNow,
+            UserIntent:        userIntent,
+            SessionObjective:  sessionObjective,
+            TokensConsumption: new TokenConsumption(0, 0));
+        _checkpoints.Add(cp);
+        return cp;
     }
 
     internal void UpdateTokenConsumption(int inputTokens, int outputTokens)
     {
-        Checkpoint = Checkpoint with
+        if (_checkpoints.Count == 0) return;
+        _checkpoints[^1] = _checkpoints[^1] with
         {
             TokensConsumption = new TokenConsumption(inputTokens, outputTokens)
         };
     }
 
-    // --- Deliverables ---
-
-    internal void RecordDeliverable(string deliverableId, string path, DeliverableStatus status)
+    internal void FinalizeSession(DateTime closedAt)
     {
-        _deliverables.Add(new Deliverable(deliverableId, path, status));
+        if (_checkpoints.Count == 0) return;
+        _checkpoints[^1] = _checkpoints[^1] with { ClosedAt = closedAt };
     }
-
-    // --- Decisions ---
-
-    internal void RecordDecision(string id, string description, string impact)
-    {
-        _decisions.Add(new Decision(id, description, impact));
-    }
-
-    // --- Questions ---
-
-    internal Question RaiseQuestion(string id, string text, string source)
-    {
-        var question = new Question(id, text, source);
-        _questions.Add(question);
-        return question;
-    }
-
-    internal void ApplyQuestionReview(string id, QuestionStatus newStatus)
-    {
-        var question = FindQuestion(id);
-        if (question is null) return;
-
-        switch (newStatus)
-        {
-            case QuestionStatus.Reviewed: question.MarkReviewed(); break;
-            case QuestionStatus.Obsolete: question.MarkObsolete(); break;
-        }
-    }
-
-    internal Question? FindQuestion(string id) => _questions.Find(q => q.Id == id);
 }

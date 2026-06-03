@@ -1,35 +1,34 @@
+using System.Text.Json;
 using AgentFramework.Core.Agent;
 using AgentFramework.Core.Agent.Conversation;
-using AgentFramework.Core.Agent.Events;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Steps;
-using AgentFramework.Core.Agent.Steps.CODESteps;
+using AgentFramework.CodePipeline;
 using AgentFramework.Domain.UxAgent;
 
 namespace AgentFramework.Core.Tests;
 
 public class StepPipelineTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static UxPersona CreateAgent()
+    private static async Task<UxAgent> CreateAgentAsync()
     {
-        var markdown = File.ReadAllText(TestDataPath);
-        return new UxPersona(RoleParser.ParseFromMarkdown(markdown), TestSteps.DefaultSteps(), TestSteps.DefaultSkills());
+        return await UxAgent.BuildAsync(UxAgentDefaults.Config(TestSteps.DefaultRole()), TestSteps.DefaultResolver());
     }
 
     [Fact]
-    public void UxPersona_Has5Steps()
+    public async Task UxAgent_Has6Steps()
     {
-        var agent = CreateAgent();
-        Assert.Equal(5, agent.Steps.Count);
+        var agent = await CreateAgentAsync();
+        Assert.Equal(6, agent.Steps.Count);
     }
 
     [Fact]
-    public void Steps_AreNumberedSequentially()
+    public async Task Steps_AreNumberedSequentially()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         for (int i = 0; i < agent.Steps.Count; i++)
         {
             Assert.Equal(i + 1, agent.Steps[i].StepNumber);
@@ -37,74 +36,63 @@ public class StepPipelineTests
     }
 
     [Fact]
-    public void Step1_UsesRehydrateContext()
+    public async Task Step1_UsesKickoffContext()
     {
-        var agent = CreateAgent();
-        Assert.Equal("rehydrate-context", agent.Steps[0].SkillName);
+        var agent = await CreateAgentAsync();
+        Assert.Contains("Kickoff-context", agent.Steps[0].SkillNames);
         Assert.Equal("Objective confirmed", agent.Steps[0].Gate.Description);
     }
 
     [Fact]
-    public void Step2_UsesAutonomousCapture()
+    public async Task Step2_UsesSixThinkingHatsAndCaptureStrict()
     {
-        var agent = CreateAgent();
-        Assert.Equal("autonomous-capture", agent.Steps[1].SkillName);
+        var agent = await CreateAgentAsync();
+        Assert.Contains("six-thinking-hats",     agent.Steps[1].SkillNames);
+        Assert.Contains("capture-strict-islands", agent.Steps[1].SkillNames);
         Assert.Equal("≥3 user-type islands", agent.Steps[1].Gate.Description);
     }
 
     [Fact]
-    public void NewAgent_StartsAtStep0_NotCompleted()
+    public async Task NewAgent_StartsAtStep0_NotCompleted()
     {
-        var agent = CreateAgent();
+        var agent = await CreateAgentAsync();
         Assert.Equal(0, agent.Pipeline.CurrentStepIndex);
         Assert.False(agent.IsCompleted);
     }
 
     [Fact]
-    public async Task ExecuteNextStep_RaisesStepStartedAndCompleted_WhenGatePasses()
+    public async Task ExecuteNextStep_AdvancesPipeline_WhenGatePasses()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
 
-        var result = await agent.ExecuteNextStepAsync(builder, client);
+        var result = await agent.ExecuteNextStepAsync(client);
 
         Assert.True(result.GateSatisfied);
         Assert.Equal(1, agent.Pipeline.CurrentStepIndex);
-        Assert.Equal(2, agent.DomainEvents.Count);
-        Assert.IsType<StepStarted>(agent.DomainEvents[0]);
-        Assert.IsType<StepCompleted>(agent.DomainEvents[1]);
     }
 
     [Fact]
-    public async Task ExecuteNextStep_RaisesStepGateFailed_WhenGateFails()
+    public async Task ExecuteNextStep_DoesNotAdvancePipeline_WhenGateFails()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: false);
 
-        var result = await agent.ExecuteNextStepAsync(builder, client);
+        var result = await agent.ExecuteNextStepAsync(client);
 
         Assert.False(result.GateSatisfied);
-        Assert.Equal(0, agent.Pipeline.CurrentStepIndex); // did not advance
-        Assert.Equal(2, agent.DomainEvents.Count);
-        Assert.IsType<StepStarted>(agent.DomainEvents[0]);
-        Assert.IsType<StepGateFailed>(agent.DomainEvents[1]);
+        Assert.Equal(0, agent.Pipeline.CurrentStepIndex);
     }
 
     [Fact]
     public async Task ExecuteAllSteps_RunsAllSteps_WhenAllGatesPass()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
 
-        var results = await agent.ExecuteAllStepsAsync(builder, client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
-        Assert.Equal(5, results.Count);
+        Assert.Equal(6, results.Count);
         Assert.True(agent.IsCompleted);
         Assert.All(results, r => Assert.True(r.GateSatisfied));
     }
@@ -112,72 +100,25 @@ public class StepPipelineTests
     [Fact]
     public async Task ExecuteAllSteps_StopsAtFailedGate()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(failAtStep: 3);
 
-        var results = await agent.ExecuteAllStepsAsync(builder, client);
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
         Assert.Equal(3, results.Count);
         Assert.False(agent.IsCompleted);
-        Assert.Equal(2, agent.Pipeline.CurrentStepIndex); // stopped at step 3 (index 2)
+        Assert.Equal(2, agent.Pipeline.CurrentStepIndex);
     }
 
     [Fact]
     public async Task ExecuteNextStep_ThrowsWhenAllCompleted()
     {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
+        var agent = await CreateAgentAsync();
         var client = new FakeChatClient(gateSatisfied: true);
-        await agent.ExecuteAllStepsAsync(builder, client);
+        await agent.ExecuteAllStepsAsync(TestSteps.DefaultIntent, client);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => agent.ExecuteNextStepAsync(builder, client));
-    }
-
-    [Fact]
-    public async Task StepStarted_CarriesCorrectSkillName()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient(gateSatisfied: true);
-
-        await agent.ExecuteNextStepAsync(builder, client);
-
-        var started = (StepStarted)agent.DomainEvents[0];
-        Assert.Equal("rehydrate-context", started.SkillName);
-        Assert.Equal(1, started.StepNumber);
-    }
-
-    [Fact]
-    public async Task StepCompleted_CarriesResult()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient(gateSatisfied: true);
-
-        await agent.ExecuteNextStepAsync(builder, client);
-
-        var completed = (StepCompleted)agent.DomainEvents[1];
-        Assert.Equal("Objective defined", completed.Result.Output);
-    }
-
-    [Fact]
-    public async Task ClearDomainEvents_EmptiesTheList()
-    {
-        var agent = CreateAgent();
-        agent.StartSession("placeholder");
-        var builder = new UxStepMessageBuilder();
-        var client = new FakeChatClient(gateSatisfied: true);
-        await agent.ExecuteNextStepAsync(builder, client);
-
-        agent.ClearDomainEvents();
-
-        Assert.Empty(agent.DomainEvents);
+            () => agent.ExecuteNextStepAsync(client));
     }
 
     private class FakeChatClient : IChatClient
@@ -191,6 +132,42 @@ public class StepPipelineTests
             _failAtStep = failAtStep;
         }
 
+        public Task<TResult> SendHandlerAsync<TResult>(
+            IReadOnlyList<ChatMessage> messages, string jsonSchema,
+            Func<JsonElement, TResult> parse, CancellationToken ct = default)
+        {
+            var passed = _failAtStep == 1 ? false : _gateSatisfied;
+            string json;
+            if (jsonSchema.Contains("triaged"))
+                json = """{"triaged":[]}""";
+            else if (jsonSchema.Contains("groupDistillations"))
+            {
+                var distillPassed = _failAtStep != 4 && _gateSatisfied;
+                json = distillPassed
+                    ? """{"groupDistillations":[{"groupId":"GRP-001","decisions":[{"id":"DEC-001","description":"Merge pain into athlete persona","impact":"Cleaner model"}],"deliverables":[{"deliverableId":"DEL-001","path":"outputs/personas/01-athlete.md","purpose":"Athlete card","status":"Complete"}],"questions":[]}],"distilledIslands":[{"islandId":"ISL-001","newStatus":"Distilled"},{"islandId":"ISL-002","newStatus":"Distilled"}],"gateSatisfied":true}"""
+                    : """{"groupDistillations":[],"distilledIslands":[],"gateSatisfied":false}""";
+            }
+            else if (jsonSchema.Contains("readiness"))
+            {
+                // Fail gate for step 3 when failAtStep==3: return Blocked (gate = ≥1 non-blocked group)
+                var readiness = (_failAtStep == 3 || !_gateSatisfied) ? "Blocked" : "Ready";
+                json = $$"""{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting","readiness":"{{readiness}}","readinessNotes":null}]}""";
+            }
+            else if (jsonSchema.Contains("islandIds"))
+                json = """{"groups":[{"id":"GRP-001","name":"Recruiting Group","islandIds":["ISL-001","ISL-002"],"whyTogether":"Both describe recruiting"}],"ungroupedIslandIds":["ISL-003"]}""";
+            else if (jsonSchema.Contains("islands"))
+                json = """{"islands":[{"id":"ISL-001","type":"UserType","description":"Student athlete","source":"six-hats:yellow","relatesToIslandId":null},{"id":"ISL-002","type":"Stakeholder","description":"College coach","source":"six-hats:white","relatesToIslandId":null},{"id":"ISL-003","type":"PainPoint","description":"No visibility","source":"six-hats:black","relatesToIslandId":"ISL-001"}]}""";
+            // UxExpress content handlers — LLM returns HTML directly
+            else if (jsonSchema.Contains("\"html\""))
+                json = """{"html":"<html><body>Test Document</body></html>"}""";
+            // UxQuestionReviewHandler — tokens + question statuses
+            else if (jsonSchema.Contains("inputTokens"))
+                json = """{"questions":[],"inputTokens":0,"outputTokens":0,"gateSatisfied":true}""";
+            else
+                json = $$"""{"sessionObjective":"Build personas for recruiting platform","narrativeBridge":"Initial session.","isInitialSession":true,"stalenessWarning":null,"gateSatisfied":{{(passed ? "true" : "false")}}}""";
+            return Task.FromResult(parse(JsonDocument.Parse(json).RootElement));
+        }
+
         public Task<StepResult> SendAsync(IReadOnlyList<ChatMessage> messages, AgentStep step, CancellationToken ct = default)
         {
             var passed = _failAtStep.HasValue
@@ -199,7 +176,7 @@ public class StepPipelineTests
 
             StepResult result = step.StepNumber switch
             {
-                1 => new RehydrateResult(
+                1 => new KickoffResult(
                     Output: "Objective defined",
                     GateSatisfied: passed,
                     SessionObjective: "Build personas for recruiting platform"),

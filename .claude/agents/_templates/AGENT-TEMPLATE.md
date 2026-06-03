@@ -33,7 +33,7 @@ tools: [editFiles, createFile]
 
 Execute sequentially. **Read each skill file ONLY when entering that step.**
 
-1. **Define objective for agent** with `rehydrate-context` → Session Objective. [Domain-specific input parsing].
+1. **Define objective for agent** with `Kickoff-context` → Session Objective. [Domain-specific input parsing].
    Gate: Objective confirmed
 
 2. **Generate unfiltered Island Backlog** with `autonomous-capture` — hunt for: [domain-specific targets · separated · by · interpuncts].

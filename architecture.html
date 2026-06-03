@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AgentFramework – Architecture Reference</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #252836;
+    --border: #2e3250;
+    --accent: #6c63ff;
+    --accent2: #00d4ff;
+    --accent3: #ff6b9d;
+    --green: #3dd68c;
+    --yellow: #ffd166;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --code-bg: #12151f;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── SIDEBAR ── */
+  nav {
+    position: fixed; top: 0; left: 0; width: 240px; height: 100vh;
+    background: var(--surface); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 24px 0; z-index: 100;
+  }
+  nav h2 { font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+            color: var(--muted); padding: 0 20px 12px; }
+  nav a {
+    display: block; padding: 7px 20px; color: var(--muted);
+    text-decoration: none; font-size: 13px; border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  nav a:hover { color: var(--text); border-left-color: var(--accent); background: var(--surface2); }
+  nav a.active { color: var(--accent2); border-left-color: var(--accent2); background: var(--surface2); }
+
+  /* ── MAIN ── */
+  main { margin-left: 240px; padding: 48px 56px; max-width: 1100px; }
+
+  h1 { font-size: 2.4rem; font-weight: 700; color: var(--text);
+       background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+       -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .subtitle { color: var(--muted); font-size: 1rem; margin-bottom: 48px; }
+
+  h2 { font-size: 1.6rem; font-weight: 600; color: var(--text); margin: 56px 0 20px;
+       padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; font-weight: 600; color: var(--accent2); margin: 28px 0 12px; }
+  h4 { font-size: .95rem; font-weight: 600; color: var(--yellow); margin: 20px 0 8px; }
+
+  p { color: var(--text); margin-bottom: 14px; }
+  ul, ol { padding-left: 24px; margin-bottom: 14px; }
+  li { margin-bottom: 6px; color: var(--text); }
+  strong { color: var(--accent2); }
+  code {
+    background: var(--code-bg); color: #a5f3fc; border-radius: 4px;
+    padding: 2px 6px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .875em;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px 24px; overflow-x: auto; margin: 16px 0 24px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .83rem; line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; color: #e2e8f0; font-size: inherit; }
+
+  /* keyword colouring */
+  .kw  { color: #c792ea; }
+  .ty  { color: #82aaff; }
+  .str { color: #c3e88d; }
+  .cmt { color: #546e7a; font-style: italic; }
+  .lit { color: #f78c6c; }
+  .prop{ color: #80cbc4; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px 28px; margin: 20px 0;
+  }
+  .card-row { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 16px; margin: 20px 0; }
+  .card-sm { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; }
+  .card-sm h4 { margin-top: 0; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-block; border-radius: 20px; padding: 3px 12px;
+    font-size: .75rem; font-weight: 600; letter-spacing: .5px; margin: 2px 4px 2px 0;
+  }
+  .b-purple { background: #3d2e7c; color: #b39ddb; }
+  .b-blue   { background: #1a3a5c; color: #82aaff; }
+  .b-green  { background: #1a3a2c; color: #3dd68c; }
+  .b-yellow { background: #3a2a00; color: #ffd166; }
+  .b-pink   { background: #3a1a2a; color: #ff6b9d; }
+  .b-cyan   { background: #0e2f3a; color: #00d4ff; }
+
+  /* ── DIAGRAM WRAPPER ── */
+  .diagram { background: var(--surface2); border: 1px solid var(--border);
+             border-radius: var(--radius); padding: 32px 20px; overflow-x: auto; margin: 24px 0; }
+  .diagram .mermaid { max-width: 100%; }
+
+  /* ── STEP TIMELINE ── */
+  .pipeline { display: flex; gap: 0; margin: 24px 0; overflow-x: auto; }
+  .step-box {
+    flex: 1; min-width: 130px; background: var(--surface2); border: 1px solid var(--border);
+    border-right: none; padding: 16px 14px; text-align: center; position: relative;
+  }
+  .step-box:last-child { border-right: 1px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0; }
+  .step-box:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+  .step-box::after {
+    content: '▶'; position: absolute; right: -13px; top: 50%; transform: translateY(-50%);
+    color: var(--border); font-size: 18px; z-index: 1;
+  }
+  .step-box:last-child::after { display: none; }
+  .step-num { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .step-name { font-size: .95rem; font-weight: 600; color: var(--accent2); margin: 4px 0; }
+  .step-gate { font-size: 11px; color: var(--yellow); }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; }
+  th { background: var(--surface2); color: var(--accent2); font-size: .8rem;
+       text-transform: uppercase; letter-spacing: 1px; padding: 10px 14px; text-align: left; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); font-size: .9rem; }
+  tr:last-child td { border-bottom: none; }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--surface2);
+    border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 20px 0;
+  }
+  .callout.warn  { border-color: var(--yellow); }
+  .callout.info  { border-color: var(--accent2); }
+  .callout.green { border-color: var(--green); }
+  .callout.pink  { border-color: var(--accent3); }
+
+  /* ── OPTION CARD ── */
+  .option { background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 24px 28px; margin: 24px 0; }
+  .option-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .option-num {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: .9rem; color: #fff; flex-shrink: 0;
+  }
+  .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .pros, .cons { background: var(--surface2); border-radius: 8px; padding: 12px 16px; }
+  .pros h5 { color: var(--green); font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .cons h5 { color: var(--accent3); font-size: .8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .pros li, .cons li { font-size: .88rem; color: var(--muted); }
+
+  /* ── SCROLL SPY ── */
+  section { padding-top: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ─────────────────── SIDEBAR ─────────────────── -->
+<nav>
+  <h2>Contents</h2>
+  <a href="#overview">1. Architecture Overview</a>
+  <a href="#layers">2. Project Layers</a>
+  <a href="#domain">3. Domain Model</a>
+  <a href="#interfaces">4. Key Interfaces</a>
+  <a href="#pipeline">5. The 5-Step Pipeline</a>
+  <a href="#chain">6. Chain &amp; Handler Pattern</a>
+  <a href="#state">7. State &amp; Session Flow</a>
+  <a href="#prompts">8. Prompt Layers</a>
+  <a href="#new-agents">9. Implementing New Agents</a>
+  <a href="#express">10. Express Step Options</a>
+  <a href="#inter-agent">11. Inter-Agent Communication</a>
+</nav>
+
+<!-- ─────────────────── MAIN ─────────────────── -->
+<main>
+  <h1>AgentFramework</h1>
+  <p class="subtitle">Architecture Reference — Multi-Agent Template System</p>
+
+  <!-- ══════════════════════════════════════════════════
+       1. OVERVIEW
+       ══════════════════════════════════════════════════ -->
+  <section id="overview">
+    <h2>1. Architecture Overview</h2>
+    <p>
+      AgentFramework is a <strong>structured, pipeline-driven AI-agent platform</strong> built on .NET 8.
+      Each agent executes a fixed sequence of <em>steps</em> (Kickoff → Capture → Organize → Distill → Express).
+      Every step calls an LLM via a clean port interface, parses a typed result, and applies
+      domain mutations through a single <strong>ISessionWriter</strong> gateway.
+    </p>
+
+    <div class="diagram">
+      <div class="mermaid">
+graph TD
+    subgraph Host["Host / Application"]
+        APP["App / Test / Worker"]
+    end
+
+    subgraph Core["AgentFramework.Core"]
+        AGG["AgentAggregate&lt;TId&gt;"]
+        PIPE["StepPipeline"]
+        STEP["AgentStep (abstract)"]
+        SW["ISessionWriter"]
+        CTX["IAgentRunContext"]
+        CHAT["IChatClient (port)"]
+    end
+
+    subgraph Domain["AgentFramework.Domain"]
+        KS["KickoffStep"]
+        CS["CaptureStep"]
+        OS["OrganizeStep"]
+        DS["DistillStep"]
+        ES["ExpressStep (CodePipeline)"]
+        CHAIN["IStepChain handlers"]
+    end
+
+    subgraph Infra["AgentFramework.Infrastructure"]
+        ANT["AnthropicChatClient"]
+        PAR["StepResultParser"]
+    end
+
+    APP --> AGG
+    AGG --> PIPE --> STEP
+    STEP --> CHAIN
+    STEP --> CHAT
+    CHAT -.implements.-> ANT
+    ANT --> PAR
+    AGG -.implements.-> SW
+    AGG -.implements.-> CTX
+    STEP --> SW
+    STEP --> CTX
+
+    style Host fill:#1a1d27,stroke:#6c63ff,color:#e2e8f0
+    style Core fill:#1a1d27,stroke:#00d4ff,color:#e2e8f0
+    style Domain fill:#1a1d27,stroke:#3dd68c,color:#e2e8f0
+    style Infra fill:#1a1d27,stroke:#ffd166,color:#e2e8f0
+      </div>
+    </div>
+
+    <div class="card-row">
+      <div class="card-sm">
+        <h4>Core Principles</h4>
+        <ul>
+          <li>Steps are <strong>immutable definitions</strong>; state lives in the aggregate</li>
+          <li>LLM is <strong>infrastructure</strong> — Core never imports it</li>
+          <li><strong>Gate</strong> = named boolean condition; pipeline only advances when gate is satisfied</li>
+          <li>All state mutations go through <code>StepResult.ApplyTo(ISessionWriter)</code></li>
+        </ul>
+      </div>
+      <div class="card-sm">
+        <h4>Dependency Flow</h4>
+        <ul>
+          <li><strong>Core</strong> → no external deps</li>
+          <li><strong>Domain</strong> → Core only</li>
+          <li><strong>CodePipeline</strong> → Core + Domain</li>
+          <li><strong>Infrastructure</strong> → Core (implements ports)</li>
+          <li><strong>Host/Tests</strong> → wires everything together</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       2. LAYERS
+       ══════════════════════════════════════════════════ -->
+  <section id="layers">
+    <h2>2. Project Layers</h2>
+
+    <table>
+      <thead><tr><th>Assembly</th><th>Namespace</th><th>Responsibility</th><th>Key Types</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-purple">AgentFramework.Core</span></td>
+          <td><code>AgentFramework.Core.*</code></td>
+          <td>Pure domain abstractions — no LLM, no I/O</td>
+          <td><code>AgentAggregate&lt;T&gt;</code>, <code>AgentStep</code>, <code>StepPipeline</code>, <code>ISessionWriter</code>, <code>IChatClient</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-blue">AgentFramework.Domain</span></td>
+          <td><code>AgentFramework.Domain.*</code></td>
+          <td>Concrete step logic and chain handlers for CODE pipeline</td>
+          <td><code>KickoffStep</code>, <code>CaptureStep</code>, <code>OrganizeStep</code>, <code>DistillStep</code>, all <code>*Handler</code> classes</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-cyan">AgentFramework.CodePipeline</span></td>
+          <td><code>AgentFramework.CodePipeline</code></td>
+          <td>Express step, concrete agent class, pipeline factory</td>
+          <td><code>ExpressStep</code>, <code>CodeAgent</code>, <code>CodePipelineFactory</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-yellow">AgentFramework.Infrastructure</span></td>
+          <td><code>AgentFramework.Infrastructure.*</code></td>
+          <td>Anthropic API adapter, result parsing</td>
+          <td><code>AnthropicChatClient</code>, <code>StepResultParser</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <strong>Critical rule:</strong> <code>AnthropicChatClient.SendHandlerAsync()</code> silently ignores
+      the <code>jsonSchema</code> parameter — it does <em>not</em> forward it to the API.
+      Every chain handler <strong>must embed its expected JSON structure verbatim in the user message</strong>
+      content so the LLM knows what field names to use.
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       3. DOMAIN MODEL
+       ══════════════════════════════════════════════════ -->
+  <section id="domain">
+    <h2>3. Domain Model</h2>
+
+    <h3>Island Lifecycle</h3>
+    <p>An <strong>Island</strong> is the atomic unit of captured knowledge — a single idea, requirement, or observation extracted from the user intent.</p>
+
+    <div class="diagram">
+      <div class="mermaid">
+stateDiagram-v2
+    [*] --> Captured : CaptureStep
+    Captured --> Organized : OrganizeStep (groups assigned)
+    Organized --> Distilled : DistillStep (promoted)
+    Organized --> Discarded : DistillStep (rejected)
+    Distilled --> [*]
+    Discarded --> [*]
+      </div>
+    </div>
+
+    <h3>Question Lifecycle</h3>
+    <p>Questions are raised during Distillation and resolved between agent sessions (by a human, orchestrator, or another agent).</p>
+
+    <div class="diagram">
+      <div class="mermaid">
+stateDiagram-v2
+    [*] --> Open : RaiseQuestion (DistillStep)
+    Open --> Answered : SupplyAnswers (between sessions)
+    Answered --> Reviewed : ExpressStep (answer incorporated)
+    Open --> Obsolete : ExpressStep (no longer relevant)
+    Answered --> Obsolete : ExpressStep
+      </div>
+    </div>
+
+    <h3>Core Entities</h3>
+    <div class="card-row">
+      <div class="card-sm">
+        <h4>Island</h4>
+        <ul>
+          <li><code>Id</code> — unique identifier</li>
+          <li><code>Content</code> — the captured text</li>
+          <li><code>Status</code> — <code>Captured | Organized | Distilled | Discarded</code></li>
+          <li><code>GroupId</code> — assigned by OrganizeStep</li>
+          <li><code>Tags</code> — semantic labels</li>
+        </ul>
+      </div>
+      <div class="card-sm">
+        <h4>Question</h4>
+        <ul>
+          <li><code>Id</code> — e.g. <code>UX-Q001</code></li>
+          <li><code>Text</code> — question body</li>
+          <li><code>Source</code> — which step raised it</li>
+          <li><code>Status</code> — <code>Open | Answered | Reviewed | Obsolete</code></li>
+          <li><code>Answer</code> / <code>AnswerSource</code> — set externally</li>
+        </ul>
+      </div>
+      <div class="card-sm">
+        <h4>Decision</h4>
+        <ul>
+          <li><code>Id</code> — unique identifier</li>
+          <li><code>Description</code> — what was decided</li>
+          <li><code>Impact</code> — scope/severity label</li>
+          <li><code>GroupId</code> — optional group association</li>
+        </ul>
+      </div>
+      <div class="card-sm">
+        <h4>Deliverable</h4>
+        <ul>
+          <li><code>DeliverableId</code></li>
+          <li><code>Path</code> — relative output path</li>
+          <li><code>Status</code> — e.g. <code>pending | complete</code></li>
+          <li><code>GroupId</code> / <code>Purpose</code> — optional</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>AgentSession</h3>
+    <p>
+      The <code>AgentSession</code> is a <strong>value snapshot</strong> that travels with the aggregate.
+      It holds: the current <code>UserIntent</code>, the <code>IslandBacklog</code>, a list of <code>IslandGroups</code>,
+      token consumption counters, and iteration history.
+    </p>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       4. KEY INTERFACES
+       ══════════════════════════════════════════════════ -->
+  <section id="interfaces">
+    <h2>4. Key Interfaces</h2>
+
+    <h3>IChatClient — the LLM Port</h3>
+    <pre><code><span class="kw">public interface</span> <span class="ty">IChatClient</span>
+{
+    <span class="cmt">// Used by DefaultStepCommand (non-chain steps like Express)</span>
+    Task&lt;<span class="ty">string</span>&gt; <span class="prop">SendAsync</span>(
+        <span class="ty">IReadOnlyList</span>&lt;<span class="ty">ChatMessage</span>&gt; messages,
+        <span class="ty">string</span>? jsonSchema,
+        <span class="ty">CancellationToken</span> ct);
+
+    <span class="cmt">// Used by chain handlers — jsonSchema is IGNORED by AnthropicChatClient</span>
+    Task&lt;<span class="ty">string</span>&gt; <span class="prop">SendHandlerAsync</span>(
+        <span class="ty">IReadOnlyList</span>&lt;<span class="ty">ChatMessage</span>&gt; messages,
+        <span class="ty">string</span>? jsonSchema,
+        <span class="ty">CancellationToken</span> ct);
+}</code></pre>
+
+    <h3>ISessionWriter — the Mutation Gateway</h3>
+    <pre><code><span class="kw">public interface</span> <span class="ty">ISessionWriter</span> : <span class="ty">IQuestionWriter</span>
+{
+    <span class="kw">void</span> <span class="prop">BeginIteration</span>(<span class="ty">string</span> sessionObjective);
+    <span class="kw">void</span> <span class="prop">UpdateObjective</span>(<span class="ty">string</span> sessionObjective);
+    <span class="kw">void</span> <span class="prop">RecordStepExchange</span>(<span class="ty">int</span> stepNumber, <span class="ty">string</span> stepName,
+        <span class="ty">IReadOnlyList</span>&lt;<span class="ty">ChatMessage</span>&gt; messages, <span class="ty">string</span> response);
+    <span class="kw">void</span> <span class="prop">SetCapturedIslands</span>(<span class="ty">IReadOnlyList</span>&lt;<span class="ty">CapturedIsland</span>&gt; islands);
+    <span class="kw">void</span> <span class="prop">ApplyOrganization</span>(...);
+    <span class="kw">void</span> <span class="prop">ApplyDistillation</span>(...);
+    <span class="kw">void</span> <span class="prop">UpdateTokenConsumption</span>(<span class="ty">int</span> inputTokens, <span class="ty">int</span> outputTokens);
+}
+
+<span class="kw">public interface</span> <span class="ty">IQuestionWriter</span>
+{
+    <span class="kw">void</span> <span class="prop">RaiseQuestion</span>(<span class="ty">string</span> id, <span class="ty">string</span> text, <span class="ty">string</span> source);   <span class="cmt">// throws on duplicate</span>
+    <span class="kw">void</span> <span class="prop">ReviewQuestion</span>(<span class="ty">string</span> id, <span class="ty">QuestionStatus</span> status, <span class="ty">string</span> text = <span class="str">""</span>); <span class="cmt">// idempotent for open</span>
+    <span class="kw">void</span> <span class="prop">RestoreQuestion</span>(...);   <span class="cmt">// hydration only</span>
+    <span class="kw">void</span> <span class="prop">AnswerQuestion</span>(...);    <span class="cmt">// between-session answer supply</span>
+}</code></pre>
+
+    <h3>IAgentRunContext — the Read Side</h3>
+    <pre><code><span class="kw">public interface</span> <span class="ty">IAgentRunContext</span>
+{
+    <span class="ty">AgentSession</span>?                       Session           { <span class="kw">get</span>; }
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">Question</span>&gt;            Questions         { <span class="kw">get</span>; }
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">Decision</span>&gt;            Decisions         { <span class="kw">get</span>; }
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">Deliverable</span>&gt;         Deliverables      { <span class="kw">get</span>; }
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">StepConversation</span>&gt;    StepConversations { <span class="kw">get</span>; }
+}</code></pre>
+
+    <h3>IStepChain — the Handler Composition Port</h3>
+    <pre><code><span class="kw">public interface</span> <span class="ty">IStepChain</span>
+{
+    Task&lt;<span class="ty">HandlerExchange</span>&gt; <span class="prop">RunAsync</span>(
+        <span class="ty">IAgentRunContext</span> context,
+        <span class="ty">IStepPromptLayer</span> promptLayer,
+        <span class="ty">IChatClient</span> chatClient,
+        <span class="ty">CancellationToken</span> ct);
+}</code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       5. PIPELINE
+       ══════════════════════════════════════════════════ -->
+  <section id="pipeline">
+    <h2>5. The 5-Step Pipeline</h2>
+
+    <div class="pipeline">
+      <div class="step-box">
+        <div class="step-num">Step 1</div>
+        <div class="step-name">Kickoff</div>
+        <div class="step-gate">Gate: objective set</div>
+      </div>
+      <div class="step-box">
+        <div class="step-num">Step 2</div>
+        <div class="step-name">Capture</div>
+        <div class="step-gate">Gate: ≥1 island</div>
+      </div>
+      <div class="step-box">
+        <div class="step-num">Step 3</div>
+        <div class="step-name">Organize</div>
+        <div class="step-gate">Gate: groups formed</div>
+      </div>
+      <div class="step-box">
+        <div class="step-num">Step 4</div>
+        <div class="step-name">Distill</div>
+        <div class="step-gate">Gate: deliverables proposed</div>
+      </div>
+      <div class="step-box">
+        <div class="step-num">Step 5</div>
+        <div class="step-name">Express</div>
+        <div class="step-gate">Gate: summary produced</div>
+      </div>
+    </div>
+
+    <h3>Step Detail Cards</h3>
+
+    <div class="card-row">
+      <div class="card-sm">
+        <span class="badge b-purple">Step 1</span> <strong>KickoffStep</strong>
+        <p style="font-size:.88rem;color:var(--muted);margin-top:8px;">
+          Single LLM call (no chain). Extracts a structured session objective from raw user intent.
+          Uses <code>DefaultStepCommand</code> which auto-injects the JSON schema into the prompt.
+        </p>
+        <p style="font-size:.85rem;"><strong>Writes:</strong> <code>Session.Objective</code></p>
+      </div>
+      <div class="card-sm">
+        <span class="badge b-blue">Step 2</span> <strong>CaptureStep</strong>
+        <p style="font-size:.88rem;color:var(--muted);margin-top:8px;">
+          Chain: <code>IslandFromObjectiveHandler</code> → <code>IslandFromQuestionsHandler</code>.
+          Extracts knowledge islands; second handler also captures islands from open questions.
+        </p>
+        <p style="font-size:.85rem;"><strong>Writes:</strong> <code>Session.Backlog</code> (Captured islands)</p>
+      </div>
+      <div class="card-sm">
+        <span class="badge b-cyan">Step 3</span> <strong>OrganizeStep</strong>
+        <p style="font-size:.88rem;color:var(--muted);margin-top:8px;">
+          Chain: <code>IslandGroupingHandler</code> → <code>GroupReadinessHandler</code>.
+          Groups islands by theme; assesses group readiness for distillation.
+        </p>
+        <p style="font-size:.85rem;"><strong>Writes:</strong> <code>Session.Groups</code>, <code>Decisions</code></p>
+      </div>
+      <div class="card-sm">
+        <span class="badge b-green">Step 4</span> <strong>DistillStep</strong>
+        <p style="font-size:.88rem;color:var(--muted);margin-top:8px;">
+          Chain: <code>GroupDistillationHandler</code> (runs per group). Promotes islands to deliverables,
+          records decisions, raises blocking questions.
+        </p>
+        <p style="font-size:.85rem;"><strong>Writes:</strong> <code>Deliverables</code>, <code>Decisions</code>, <code>Questions</code></p>
+      </div>
+      <div class="card-sm">
+        <span class="badge b-yellow">Step 5</span> <strong>ExpressStep</strong>
+        <p style="font-size:.88rem;color:var(--muted);margin-top:8px;">
+          Single LLM call (no chain). Reviews questions, updates token consumption, produces
+          a human-readable summary of the session.
+        </p>
+        <p style="font-size:.85rem;"><strong>Writes:</strong> token stats, question statuses</p>
+      </div>
+    </div>
+
+    <h3>Execution Flow</h3>
+    <div class="diagram">
+      <div class="mermaid">
+sequenceDiagram
+    participant App
+    participant Aggregate as AgentAggregate
+    participant Pipeline as StepPipeline
+    participant Step as AgentStep
+    participant LLM as IChatClient
+
+    App->>Aggregate: RunAsync(userIntent, chatClient, deliverableWriter)
+    Aggregate->>Aggregate: Session.SetUserIntent(intent)
+
+    loop each step until IsCompleted
+        Aggregate->>Pipeline: TryGetCurrentStep()
+        Pipeline-->>Aggregate: current step
+        Aggregate->>Step: ExecuteStepAsync(context, writer, chatClient)
+        Step->>LLM: SendAsync / chain handlers
+        LLM-->>Step: JSON response
+        Step-->>Aggregate: StepResult
+        Aggregate->>Aggregate: result.ApplyTo(this)
+        alt GateSatisfied
+            Aggregate->>Pipeline: Advance()
+        else
+            Aggregate->>App: break (re-run or handle)
+        end
+    end
+
+    Aggregate->>App: deliverableWriter.WriteAsync(...)
+    Aggregate-->>App: AgentRunResult
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       6. CHAIN & HANDLER PATTERN
+       ══════════════════════════════════════════════════ -->
+  <section id="chain">
+    <h2>6. Chain &amp; Handler Pattern</h2>
+    <p>
+      Steps that need multiple LLM calls use an <strong>IStepChain</strong>.
+      Each <strong>CommandHandlerBase</strong> owns one LLM call, builds its own prompt,
+      and writes its typed output into a shared <strong>HandlerExchange</strong> journal.
+    </p>
+
+    <div class="diagram">
+      <div class="mermaid">
+sequenceDiagram
+    participant Step
+    participant Chain as IStepChain
+    participant H1 as Handler 1
+    participant H2 as Handler 2
+    participant LLM as IChatClient
+
+    Step->>Chain: RunAsync(context, promptLayer, chatClient)
+    Chain->>H1: RunAsync(exchange)
+    H1->>H1: BuildUserContent(exchange)
+    H1->>LLM: SendHandlerAsync(messages, schema)
+    LLM-->>H1: JSON string
+    H1->>H1: ParseResponse(json) → typed record
+    H1->>Chain: exchange.Record(result)
+    Chain->>H2: RunAsync(exchange)
+    H2->>H2: reads H1 result from exchange.Get&lt;T&gt;()
+    H2->>LLM: SendHandlerAsync(messages, schema)
+    LLM-->>H2: JSON string
+    H2->>Chain: exchange.Record(result)
+    Chain-->>Step: HandlerExchange (all results)
+    Step->>Step: ParseResult(exchange) → StepResult
+      </div>
+    </div>
+
+    <h3>Implementing a Handler</h3>
+    <pre><code><span class="kw">internal class</span> <span class="ty">MyAnalysisHandler</span>(<span class="ty">IStepPromptLayer</span> promptLayer)
+    : <span class="ty">CommandHandlerBase</span>(<span class="str">"my-analysis"</span>, promptLayer)
+{
+    <span class="cmt">// ⚠️ CRITICAL: embed schema verbatim — SendHandlerAsync ignores the jsonSchema param</span>
+    <span class="kw">private const string</span> <span class="prop">AnalysisSchema</span> = <span class="str">"""
+        {
+          "findings": [
+            { "id": "F-001", "category": "string", "summary": "string", "priority": "high|medium|low" }
+          ],
+          "confidence": 0.95
+        }
+        """</span>;
+
+    <span class="kw">protected override string</span> <span class="prop">BuildUserContent</span>(<span class="ty">HandlerExchange</span> exchange)
+    {
+        <span class="cmt">// read prior handler result if needed</span>
+        <span class="kw">var</span> upstream = exchange.Get&lt;<span class="ty">CaptureHandlerResult</span>&gt;();
+
+        <span class="kw">return</span> <span class="str">$"""
+            Analyze the following captured islands:
+            {FormatIslands(upstream.Islands)}
+
+            Respond using EXACTLY this JSON structure — use these field names verbatim:
+            {AnalysisSchema}
+            """</span>;
+    }
+
+    <span class="kw">protected override</span> <span class="ty">HandlerResult</span> <span class="prop">ParseResponse</span>(<span class="ty">string</span> json)
+    {
+        <span class="kw">using var</span> doc = <span class="ty">JsonDocument</span>.Parse(json);
+        <span class="cmt">// ... parse findings ...</span>
+        <span class="kw">return new</span> <span class="ty">MyAnalysisResult</span>(findings);
+    }
+}</code></pre>
+
+    <h3>HandlerExchange</h3>
+    <p>
+      <code>HandlerExchange</code> is a typed journal passed through the chain. Handlers write typed
+      records using <code>exchange.Record(result)</code> and read upstream results using
+      <code>exchange.Get&lt;T&gt;()</code>. The final step reads the complete exchange to build its
+      <code>StepResult</code>.
+    </p>
+
+    <div class="callout warn">
+      <strong>Schema embedding is mandatory for chain handlers.</strong>
+      Without the JSON schema embedded in the user message, the LLM will invent field names
+      (e.g. <code>groupId</code> instead of <code>id</code>), and the parser will silently produce
+      empty collections — causing gate failures with no error thrown.
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       7. STATE & SESSION FLOW
+       ══════════════════════════════════════════════════ -->
+  <section id="state">
+    <h2>7. State &amp; Session Flow</h2>
+
+    <table>
+      <thead><tr><th>Step</th><th>Reads from Context</th><th>Writes to Aggregate</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge b-purple">Kickoff</span></td>
+          <td><code>Session.UserIntent</code></td>
+          <td><code>Session.Objective</code>, iteration start</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-blue">Capture</span></td>
+          <td><code>Session.Objective</code>, open <code>Questions</code></td>
+          <td><code>Session.Backlog</code> (islands in Captured state)</td>
+        </tr>
+        <tr>
+          <td><span class="badge b-cyan">Organize</span></td>
+          <td><code>Session.Backlog</code></td>
+          <td><code>Session.Groups</code>, island statuses → Organized, <code>Decisions</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-green">Distill</span></td>
+          <td><code>Session.Groups</code>, organized islands</td>
+          <td><code>Deliverables</code>, island statuses → Distilled/Discarded, <code>Decisions</code>, <code>Questions</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge b-yellow">Express</span></td>
+          <td><code>Deliverables</code>, <code>Questions</code>, <code>Session.Backlog</code> stats</td>
+          <td>Token consumption, question status updates</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>AgentAggregate State Machine</h3>
+    <div class="diagram">
+      <div class="mermaid">
+stateDiagram-v2
+    [*] --> Created : new AgentAggregate(id, projectId, promptCtx)
+    Created --> Running : RunAsync() / ExecuteNextStepAsync()
+    Running --> Running : GateSatisfied=true → Pipeline.Advance()
+    Running --> Stalled : GateSatisfied=false (LLM didn't satisfy gate)
+    Stalled --> Running : Caller retries ExecuteNextStepAsync()
+    Running --> Completed : Pipeline.IsCompleted = true
+    Completed --> [*]
+      </div>
+    </div>
+
+    <h3>Between Sessions — Answer Supply</h3>
+    <pre><code><span class="cmt">// After session 1 completes with open questions:</span>
+<span class="kw">var</span> openQs = agent.GetOpenQuestions();
+
+<span class="cmt">// Human or another agent provides answers:</span>
+agent.SupplyAnswers([
+    (<span class="str">"UX-Q001"</span>, <span class="str">"Use OAuth 2.0 with PKCE"</span>, <span class="str">"security-review-agent"</span>),
+    (<span class="str">"ARCH-Q002"</span>, <span class="str">"PostgreSQL with pgvector"</span>, <span class="str">"architect-agent"</span>),
+]);
+
+<span class="cmt">// Session 2 — CaptureStep will include answered questions in context</span>
+<span class="kw">await</span> agent.RunAsync(newIntent, chatClient, writer);</code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       8. PROMPT LAYERS
+       ══════════════════════════════════════════════════ -->
+  <section id="prompts">
+    <h2>8. Prompt Layers &amp; Skill System</h2>
+
+    <p>
+      Prompt construction is layered. Each layer adds context without the step knowing about it.
+      The <code>IStepPromptLayer</code> port abstracts this so any provider (file-based, in-memory,
+      or composited) can be plugged in.
+    </p>
+
+    <div class="card-row">
+      <div class="card-sm">
+        <h4>Layer 1 — System Role</h4>
+        <p style="font-size:.88rem;color:var(--muted);">
+          Agent identity, persona, core capabilities. Set via <code>RolePromptAgentContext</code>
+          passed to the aggregate constructor. Example: <em>"You are a senior software architect
+          specialising in DDD…"</em>
+        </p>
+      </div>
+      <div class="card-sm">
+        <h4>Layer 2 — Step Instructions</h4>
+        <p style="font-size:.88rem;color:var(--muted);">
+          Per-step instructions set at step creation time (<code>instructions</code> parameter).
+          Describes the goal and constraints of that specific step.
+        </p>
+      </div>
+      <div class="card-sm">
+        <h4>Layer 3 — Dynamic Context</h4>
+        <p style="font-size:.88rem;color:var(--muted);">
+          Generated by <code>step.BuildContext(IAgentRunContext)</code> at call time.
+          Injects current state: islands, deliverables, questions, token stats.
+        </p>
+      </div>
+      <div class="card-sm">
+        <h4>Layer 4 — Schema</h4>
+        <p style="font-size:.88rem;color:var(--muted);">
+          For non-chain steps: injected automatically by <code>DefaultStepCommand</code>
+          from <code>step.JsonResponseSchema</code>.
+          For chain handlers: <strong>must be embedded manually</strong> in the user message.
+        </p>
+      </div>
+    </div>
+
+    <h3>DefaultStepCommand — Non-Chain Prompt Structure</h3>
+    <pre><code><span class="cmt">// What DefaultStepCommand appends to the user message automatically:</span>
+<span class="str">"""
+### Required Response Format
+Respond ONLY with a JSON object matching this schema:
+```json
+{schema}
+```
+Gate: {gate}
+"""</span></code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       9. IMPLEMENTING NEW AGENTS
+       ══════════════════════════════════════════════════ -->
+  <section id="new-agents">
+    <h2>9. Implementing New Agents</h2>
+
+    <p>
+      New agents follow an 8-step recipe. The framework is designed so you only
+      need to create the steps that differ from the standard pipeline — inherit the rest.
+    </p>
+
+    <h3>Step-by-Step Checklist</h3>
+
+    <div class="card">
+      <h4>① Define the Agent Class</h4>
+      <p>Extend <code>AgentAggregate&lt;TId&gt;</code>. Set up the pipeline in the constructor.</p>
+      <pre><code><span class="kw">public class</span> <span class="ty">SecurityAuditAgent</span> : <span class="ty">AgentAggregate</span>&lt;<span class="ty">Guid</span>&gt;
+{
+    <span class="kw">public</span> <span class="ty">SecurityAuditAgent</span>(<span class="ty">Guid</span> id, <span class="ty">string</span> projectId, <span class="ty">IStepPromptLayer</span> rolePrompt)
+        : <span class="kw">base</span>(id, projectId, rolePrompt)
+    {
+        Id = id;
+        Pipeline = <span class="ty">SecurityAuditPipelineFactory</span>.Build(rolePrompt);
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>② Create a Pipeline Factory</h4>
+      <p>Assemble the <code>StepPipeline</code> with the steps in order.</p>
+      <pre><code><span class="kw">public static class</span> <span class="ty">SecurityAuditPipelineFactory</span>
+{
+    <span class="kw">public static</span> <span class="ty">StepPipeline</span> <span class="prop">Build</span>(<span class="ty">IStepPromptLayer</span> rolePrompt)
+    {
+        <span class="kw">var</span> gate = <span class="kw">new</span> <span class="ty">Gate</span>(<span class="str">"security-audit-complete"</span>);
+
+        <span class="kw">return new</span> <span class="ty">StepPipeline</span>([
+            <span class="kw">new</span> <span class="ty">KickoffStep</span>(rolePrompt, <span class="lit">1</span>, <span class="str">"Clarify the security audit scope."</span>, gate),
+            <span class="kw">new</span> <span class="ty">CaptureStep</span>(rolePrompt, <span class="lit">2</span>, <span class="str">"Extract security concerns."</span>, gate),
+            <span class="kw">new</span> <span class="ty">ThreatModelStep</span>(rolePrompt, <span class="lit">3</span>, <span class="str">"Model threats per STRIDE."</span>, gate),
+            <span class="kw">new</span> <span class="ty">RemediationStep</span>(rolePrompt, <span class="lit">4</span>, <span class="str">"Propose remediations."</span>, gate),
+            <span class="kw">new</span> <span class="ty">ExpressStep</span>(rolePrompt, <span class="lit">5</span>, <span class="str">"Summarise findings and open questions."</span>, gate),
+        ]);
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>③ Define Custom Step Results</h4>
+      <p>Create typed records that extend <code>StepResult</code> and implement <code>ApplyTo</code>.</p>
+      <pre><code><span class="kw">public record</span> <span class="ty">ThreatModelResult</span>(
+    <span class="ty">string</span> Output,
+    <span class="ty">bool</span> GateSatisfied,
+    <span class="ty">IReadOnlyList</span>&lt;<span class="ty">ThreatRecord</span>&gt; Threats) : <span class="ty">StepResult</span>(Output, GateSatisfied)
+{
+    <span class="kw">public override void</span> <span class="prop">ApplyTo</span>(<span class="ty">ISessionWriter</span> writer)
+    {
+        <span class="kw">foreach</span> (<span class="kw">var</span> threat <span class="kw">in</span> Threats)
+        {
+            <span class="cmt">// Raise a question for each high-severity threat</span>
+            <span class="kw">if</span> (threat.Severity == <span class="str">"high"</span>)
+                writer.RaiseQuestion(threat.Id, threat.Description, <span class="str">"threat-model"</span>);
+        }
+    }
+}
+
+<span class="kw">public record</span> <span class="ty">ThreatRecord</span>(<span class="ty">string</span> Id, <span class="ty">string</span> Description, <span class="ty">string</span> Severity, <span class="ty">string</span> Stride);</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>④ Implement the Custom Step</h4>
+      <p>Extend <code>AgentStep</code>. Provide the JSON schema and parse logic.</p>
+      <pre><code><span class="kw">public class</span> <span class="ty">ThreatModelStep</span> : <span class="ty">AgentStep</span>
+{
+    <span class="kw">public</span> <span class="ty">ThreatModelStep</span>(<span class="ty">IStepPromptLayer</span> ctx, <span class="ty">int</span> num, <span class="ty">string</span> instructions, <span class="ty">Gate</span> gate,
+        <span class="ty">IStepChain</span>? chain = <span class="kw">null</span>)
+        : <span class="kw">base</span>(ctx, num, <span class="str">"threat-model"</span>, instructions, gate, chain) { }
+
+    <span class="kw">public override string</span> <span class="prop">JsonResponseSchema</span> => <span class="str">"""
+        {
+          "threats": [
+            {
+              "id": "T-001",
+              "description": "string",
+              "severity": "high|medium|low",
+              "stride": "S|T|R|I|D|E",
+              "affectedComponent": "string"
+            }
+          ],
+          "gateSatisfied": true
+        }
+        """</span>;
+
+    <span class="kw">public override string</span> <span class="prop">BuildContext</span>(<span class="ty">IAgentRunContext</span>? context)
+    {
+        <span class="kw">if</span> (context <span class="kw">is null</span>) <span class="kw">return</span> <span class="str">"No context."</span>;
+        <span class="kw">var</span> islands = context.Session?.Backlog?.GetAll()
+            .Select(i => <span class="str">$"- {i.Content}"</span>) ?? [];
+        <span class="kw">return</span> <span class="str">$"Captured concerns:\n{string.Join("\n", islands)}"</span>;
+    }
+
+    <span class="kw">public override</span> <span class="ty">StepResult</span> <span class="prop">ParseResult</span>(<span class="ty">JsonElement</span> root, <span class="ty">string</span> rawOutput, <span class="ty">bool</span> gateSatisfied)
+    {
+        <span class="kw">var</span> threats = <span class="kw">new</span> <span class="ty">List</span>&lt;<span class="ty">ThreatRecord</span>&gt;();
+        <span class="kw">if</span> (root.TryGetProperty(<span class="str">"threats"</span>, <span class="kw">out var</span> arr))
+            <span class="kw">foreach</span> (<span class="kw">var</span> el <span class="kw">in</span> arr.EnumerateArray())
+                threats.Add(<span class="kw">new</span> <span class="ty">ThreatRecord</span>(
+                    el.GetProperty(<span class="str">"id"</span>).GetString() ?? <span class="str">""</span>,
+                    el.GetProperty(<span class="str">"description"</span>).GetString() ?? <span class="str">""</span>,
+                    el.GetProperty(<span class="str">"severity"</span>).GetString() ?? <span class="str">"low"</span>,
+                    el.GetProperty(<span class="str">"stride"</span>).GetString() ?? <span class="str">""</span>));
+
+        <span class="kw">return new</span> <span class="ty">ThreatModelResult</span>(rawOutput, gateSatisfied, threats);
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>⑤ Add Chain Handlers (if needed)</h4>
+      <p>For multi-call steps, implement handlers and wire them into a chain.</p>
+      <pre><code><span class="cmt">// If ThreatModelStep needs two LLM calls:</span>
+<span class="kw">var</span> chain = <span class="kw">new</span> <span class="ty">SequentialStepChain</span>([
+    <span class="kw">new</span> <span class="ty">ThreatIdentificationHandler</span>(rolePrompt),
+    <span class="kw">new</span> <span class="ty">ThreatScoringHandler</span>(rolePrompt),
+]);
+<span class="kw">new</span> <span class="ty">ThreatModelStep</span>(rolePrompt, <span class="lit">3</span>, instructions, gate, chain);</code></pre>
+      <div class="callout warn" style="margin-top:12px;">
+        Remember: every handler <strong>must embed its JSON schema</strong> in the user message content.
+        Do not rely on the <code>jsonSchema</code> parameter being forwarded to the API.
+      </div>
+    </div>
+
+    <div class="card">
+      <h4>⑥ Extend the Aggregate (optional)</h4>
+      <p>If your agent needs domain-specific collections or query methods, extend the aggregate.</p>
+      <pre><code><span class="kw">public class</span> <span class="ty">SecurityAuditAgent</span> : <span class="ty">AgentAggregate</span>&lt;<span class="ty">Guid</span>&gt;
+{
+    <span class="cmt">// Add domain-specific outputs</span>
+    <span class="kw">private readonly</span> <span class="ty">List</span>&lt;<span class="ty">ThreatRecord</span>&gt; _threats = [];
+    <span class="kw">public</span> <span class="ty">IReadOnlyList</span>&lt;<span class="ty">ThreatRecord</span>&gt; <span class="prop">Threats</span> => _threats.AsReadOnly();
+
+    <span class="cmt">// Expose a mutation method that downstream results can call</span>
+    <span class="kw">public void</span> <span class="prop">AddThreat</span>(<span class="ty">ThreatRecord</span> threat) => _threats.Add(threat);
+}</code></pre>
+      <p>
+        Then in <code>ThreatModelResult.ApplyTo</code>, cast the writer to your concrete type:
+      </p>
+      <pre><code><span class="kw">public override void</span> <span class="prop">ApplyTo</span>(<span class="ty">ISessionWriter</span> writer)
+{
+    <span class="kw">if</span> (writer <span class="kw">is</span> <span class="ty">SecurityAuditAgent</span> agent)
+        <span class="kw">foreach</span> (<span class="kw">var</span> t <span class="kw">in</span> Threats)
+            agent.AddThreat(t);
+}</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>⑦ Register the Deliverable Writer</h4>
+      <p>
+        Implement <code>IDeliverableWriter</code> to materialise outputs (files, API calls, database records).
+        Called by <code>RunAsync</code> after all steps, regardless of gate satisfaction.
+      </p>
+      <pre><code><span class="kw">public class</span> <span class="ty">SecurityReportWriter</span> : <span class="ty">IDeliverableWriter</span>
+{
+    <span class="kw">public async</span> <span class="ty">Task</span> <span class="prop">WriteAsync</span>(
+        <span class="ty">IAgentRunContext</span> context,
+        <span class="ty">IReadOnlyList</span>&lt;<span class="ty">StepResult</span>&gt; results,
+        <span class="ty">CancellationToken</span> ct)
+    {
+        <span class="kw">var</span> threats = results
+            .OfType&lt;<span class="ty">ThreatModelResult</span>&gt;()
+            .SelectMany(r => r.Threats)
+            .ToList();
+
+        <span class="kw">var</span> report = <span class="ty">SecurityReportBuilder</span>.Build(threats, context.Decisions);
+        <span class="kw">await</span> <span class="ty">File</span>.WriteAllTextAsync(<span class="str">"security-report.md"</span>, report, ct);
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+      <h4>⑧ Write &amp; Wire Tests</h4>
+      <p>Test each layer in isolation:</p>
+      <ul>
+        <li><strong>Unit tests</strong> — mock <code>IChatClient</code>, test <code>ApplyTo</code> in isolation</li>
+        <li><strong>Step tests</strong> — feed canned JSON through <code>step.ParseResult()</code></li>
+        <li><strong>Integration tests</strong> — use a real <code>AnthropicChatClient</code> against the live API (tag <code>[LiveApi]</code>)</li>
+      </ul>
+      <pre><code>[<span class="ty">Fact</span>]
+<span class="kw">public void</span> <span class="prop">ThreatModel_ParseResult_ExtractsThreats</span>()
+{
+    <span class="kw">var</span> step = <span class="kw">new</span> <span class="ty">ThreatModelStep</span>(<span class="ty">PromptContext</span>.Empty, <span class="lit">3</span>, <span class="str">""</span>, <span class="kw">new</span> <span class="ty">Gate</span>(<span class="str">"g"</span>));
+    <span class="kw">using var</span> doc = <span class="ty">JsonDocument</span>.Parse(<span class="str">"""
+        {"threats":[{"id":"T-001","description":"SQL injection","severity":"high","stride":"T","affectedComponent":"API"}],
+         "gateSatisfied":true}
+        """</span>);
+
+    <span class="kw">var</span> result = (<span class="ty">ThreatModelResult</span>) step.ParseResult(doc.RootElement, <span class="str">""</span>, <span class="kw">true</span>);
+
+    <span class="ty">Assert</span>.Single(result.Threats);
+    <span class="ty">Assert</span>.Equal(<span class="str">"T-001"</span>, result.Threats[<span class="lit">0</span>].Id);
+    <span class="ty">Assert</span>.Equal(<span class="str">"high"</span>, result.Threats[<span class="lit">0</span>].Severity);
+}</code></pre>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       10. EXPRESS STEP OPTIONS
+       ══════════════════════════════════════════════════ -->
+  <section id="express">
+    <h2>10. Express Step Design Options</h2>
+
+    <p>
+      The Express step is the only step in <code>AgentFramework.CodePipeline</code>
+      (the others live in <code>AgentFramework.Domain</code>). It is intentionally thin by default —
+      a single relay call. Here are the four architectural patterns you can choose from.
+    </p>
+
+    <!-- Option 1 -->
+    <div class="option">
+      <div class="option-header">
+        <div class="option-num">1</div>
+        <div>
+          <h3 style="margin:0;color:var(--text);">Default LLM Relay</h3>
+          <span class="badge b-green">Current implementation</span>
+          <span class="badge b-blue">Simplest</span>
+        </div>
+      </div>
+      <p>
+        A single <code>DefaultStepCommand</code> call. The LLM receives deliverables, island stats,
+        decisions, and the full question list. It returns token counts, updated question statuses,
+        and a natural-language summary.
+      </p>
+      <pre><code><span class="cmt">// JsonResponseSchema already has questions[], inputTokens, outputTokens, gateSatisfied</span>
+<span class="cmt">// ExpressResult.ApplyTo calls writer.ReviewQuestion for every question returned</span>
+<span class="cmt">// New open questions the LLM discovers are auto-created via ReviewQuestion(id, Open, text)</span></code></pre>
+      <div class="pros-cons">
+        <div class="pros">
+          <h5>Pros</h5>
+          <ul>
+            <li>Zero extra code</li>
+            <li>LLM synthesises across all steps</li>
+            <li>Handles question discovery organically</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h5>Cons</h5>
+          <ul>
+            <li>LLM may hallucinate question statuses</li>
+            <li>Non-deterministic token reporting</li>
+            <li>Hard to unit-test without mocking LLM</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option 2 -->
+    <div class="option">
+      <div class="option-header">
+        <div class="option-num">2</div>
+        <div>
+          <h3 style="margin:0;color:var(--text);">Chain-Based with Parallel Writers</h3>
+          <span class="badge b-cyan">Structured</span>
+          <span class="badge b-yellow">Recommended for production</span>
+        </div>
+      </div>
+      <p>
+        Split the Express step into two chain handlers:
+        <strong>NarrativeSummaryHandler</strong> (writes the human-readable summary) and
+        <strong>QuestionReviewHandler</strong> (deterministically updates question statuses).
+        The second handler runs in parallel or sequentially.
+      </p>
+      <pre><code><span class="kw">var</span> expressChain = <span class="kw">new</span> <span class="ty">SequentialStepChain</span>([
+    <span class="kw">new</span> <span class="ty">NarrativeSummaryHandler</span>(rolePrompt),  <span class="cmt">// free-form summary, no JSON needed</span>
+    <span class="kw">new</span> <span class="ty">QuestionReviewHandler</span>(rolePrompt),    <span class="cmt">// structured JSON: question status updates</span>
+]);
+
+<span class="kw">new</span> <span class="ty">ExpressStep</span>(rolePrompt, <span class="lit">5</span>, instructions, gate, chain: expressChain);</code></pre>
+      <p>In <code>QuestionReviewHandler.BuildUserContent</code>:</p>
+      <pre><code><span class="kw">return</span> <span class="str">$"""
+    For each question below, decide the new status.
+    {BuildQuestionsBlock(exchange.Context.Questions)}
+
+    Respond using EXACTLY this JSON structure:
+    {ReviewSchema}
+    """</span>;</code></pre>
+      <div class="pros-cons">
+        <div class="pros">
+          <h5>Pros</h5>
+          <ul>
+            <li>Deterministic question management</li>
+            <li>Summary is free-form (better quality)</li>
+            <li>Each handler is independently testable</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h5>Cons</h5>
+          <ul>
+            <li>Two LLM calls (extra latency/cost)</li>
+            <li>More boilerplate</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option 3 -->
+    <div class="option">
+      <div class="option-header">
+        <div class="option-num">3</div>
+        <div>
+          <h3 style="margin:0;color:var(--text);">IDeliverableWriter Post-Processing</h3>
+          <span class="badge b-purple">Offline</span>
+          <span class="badge b-pink">Event-driven style</span>
+        </div>
+      </div>
+      <p>
+        Keep ExpressStep minimal. Move the "what to do with results" logic entirely into the
+        <code>IDeliverableWriter</code>. The writer receives all <code>StepResult</code> objects and
+        the full <code>IAgentRunContext</code> — it can call external services, write files,
+        publish events, or forward questions to a message bus.
+      </p>
+      <pre><code><span class="kw">public class</span> <span class="ty">SlackNotifyingWriter</span> : <span class="ty">IDeliverableWriter</span>
+{
+    <span class="kw">public async</span> <span class="ty">Task</span> <span class="prop">WriteAsync</span>(<span class="ty">IAgentRunContext</span> ctx, <span class="ty">IReadOnlyList</span>&lt;<span class="ty">StepResult</span>&gt; results,
+        <span class="ty">CancellationToken</span> ct)
+    {
+        <span class="cmt">// Post deliverables to Jira</span>
+        <span class="kw">foreach</span> (<span class="kw">var</span> d <span class="kw">in</span> ctx.Deliverables)
+            <span class="kw">await</span> _jira.CreateIssueAsync(d, ct);
+
+        <span class="cmt">// Route open questions to another agent</span>
+        <span class="kw">var</span> openQs = ctx.Questions.Where(q => q.Status == <span class="ty">QuestionStatus</span>.Open).ToList();
+        <span class="kw">if</span> (openQs.Any())
+            <span class="kw">await</span> _questionRouter.RouteAsync(openQs, ct);
+    }
+}</code></pre>
+      <div class="pros-cons">
+        <div class="pros">
+          <h5>Pros</h5>
+          <ul>
+            <li>Clean separation: LLM vs side-effects</li>
+            <li>No extra LLM calls for plumbing</li>
+            <li>Fully testable without LLM</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h5>Cons</h5>
+          <ul>
+            <li>No LLM synthesis in the writer</li>
+            <li>Question routing logic outside the domain</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option 4 -->
+    <div class="option">
+      <div class="option-header">
+        <div class="option-num">4</div>
+        <div>
+          <h3 style="margin:0;color:var(--text);">Hybrid: LLM Narrative + Chain Writers</h3>
+          <span class="badge b-yellow">Flexible</span>
+          <span class="badge b-green">Best quality</span>
+        </div>
+      </div>
+      <p>
+        Three-handler chain: <strong>NarrativeHandler</strong> (LLM free-form summary),
+        <strong>QuestionReviewHandler</strong> (LLM structured JSON for question statuses),
+        <strong>DeterministicFinalizeHandler</strong> (no LLM — reads exchange results, calculates
+        actual token totals from step conversations, emits the final structured payload).
+      </p>
+      <pre><code><span class="kw">var</span> chain = <span class="kw">new</span> <span class="ty">SequentialStepChain</span>([
+    <span class="kw">new</span> <span class="ty">NarrativeHandler</span>(rolePrompt),           <span class="cmt">// LLM: free-form summary</span>
+    <span class="kw">new</span> <span class="ty">QuestionReviewHandler</span>(rolePrompt),       <span class="cmt">// LLM: structured question review</span>
+    <span class="kw">new</span> <span class="ty">TokenTallyHandler</span>(<span class="ty">TokenSource</span>.FromContext), <span class="cmt">// Pure: sums actual token usage</span>
+]);</code></pre>
+      <p>
+        <code>TokenTallyHandler</code> reads <code>exchange.Context.StepConversations</code> to compute
+        real input/output token totals from the conversation log rather than asking the LLM to self-report.
+      </p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h5>Pros</h5>
+          <ul>
+            <li>Accurate token accounting</li>
+            <li>High-quality summary</li>
+            <li>Deterministic finalisation</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h5>Cons</h5>
+          <ul>
+            <li>Most complex implementation</li>
+            <li>Three handlers = more moving parts</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════
+       11. INTER-AGENT COMMUNICATION
+       ══════════════════════════════════════════════════ -->
+  <section id="inter-agent">
+    <h2>11. Inter-Agent Communication</h2>
+
+    <p>
+      Questions raised in the <strong>Distill step</strong> are the primary inter-agent communication
+      mechanism. They represent <em>things the current agent cannot resolve alone</em> and need
+      input from another agent, a human, or an external system.
+    </p>
+
+    <h3>The Question Bus Pattern</h3>
+    <div class="diagram">
+      <div class="mermaid">
+graph LR
+    subgraph Session1["Agent A — Session 1"]
+        DS1["DistillStep"] -->|"RaiseQuestion(UX-Q001)"| QS1["Questions: Open"]
+        ES1["ExpressStep"] -->|"reports open questions"| QS1
+    end
+
+    subgraph Router["Question Router / Orchestrator"]
+        QR["Route by question ID prefix"]
+    end
+
+    subgraph Session2["Agent B — Specialised"]
+        KB["KickoffStep"] -->|"intent = answer UX-Q001"| RUN["RunAsync()"]
+        RUN -->|"produces answer"| ANS["AnswerRecord"]
+    end
+
+    subgraph Session3["Agent A — Session 2"]
+        SA["SupplyAnswers(UX-Q001, answer)"]
+        CS3["CaptureStep — now includes answered question context"]
+    end
+
+    QS1 -->|"open questions"| QR
+    QR -->|"dispatch"| Session2
+    ANS -->|"answer text"| SA
+    SA --> CS3
+
+    style Session1 fill:#1a1d27,stroke:#6c63ff,color:#e2e8f0
+    style Router fill:#1a1d27,stroke:#ffd166,color:#e2e8f0
+    style Session2 fill:#1a1d27,stroke:#3dd68c,color:#e2e8f0
+    style Session3 fill:#1a1d27,stroke:#00d4ff,color:#e2e8f0
+      </div>
+    </div>
+
+    <h3>Pattern 1 — Sequential Sessions (same agent)</h3>
+    <p>The simplest pattern: run the same agent twice. Between sessions, supply answers externally.</p>
+    <pre><code><span class="cmt">// Session 1</span>
+<span class="kw">var</span> result1 = <span class="kw">await</span> agentA.RunAsync(<span class="str">"Design the auth module"</span>, chatClient, writer);
+
+<span class="cmt">// Inspect open questions</span>
+<span class="kw">var</span> openQs = agentA.GetOpenQuestions();
+<span class="cmt">// → [UX-Q001: "What token expiry should we use?", ARCH-Q002: "Redis or in-process cache?"]</span>
+
+<span class="cmt">// Human or another agent resolves them</span>
+agentA.SupplyAnswers([
+    (<span class="str">"UX-Q001"</span>, <span class="str">"15 minutes for access, 7 days for refresh"</span>, <span class="str">"product-owner"</span>),
+    (<span class="str">"ARCH-Q002"</span>, <span class="str">"Redis — we need distributed session support"</span>, <span class="str">"architect"</span>),
+]);
+
+<span class="cmt">// Session 2 — CaptureStep will see both questions as Answered in BuildContext</span>
+<span class="kw">var</span> result2 = <span class="kw">await</span> agentA.RunAsync(<span class="str">"Implement auth module (answers available)"</span>, chatClient, writer);</code></pre>
+
+    <h3>Pattern 2 — Direct Agent-to-Agent</h3>
+    <p>Agent A's <code>IDeliverableWriter</code> spawns Agent B as a sub-task.</p>
+    <pre><code><span class="kw">public class</span> <span class="ty">OrchestratingWriter</span>(<span class="ty">IChatClient</span> chatClient) : <span class="ty">IDeliverableWriter</span>
+{
+    <span class="kw">public async</span> <span class="ty">Task</span> <span class="prop">WriteAsync</span>(<span class="ty">IAgentRunContext</span> ctx, <span class="ty">IReadOnlyList</span>&lt;<span class="ty">StepResult</span>&gt; results,
+        <span class="ty">CancellationToken</span> ct)
+    {
+        <span class="kw">var</span> securityQs = ctx.Questions
+            .Where(q => q.Id.StartsWith(<span class="str">"SEC-"</span>) &amp;&amp; q.Status == <span class="ty">QuestionStatus</span>.Open)
+            .ToList();
+
+        <span class="kw">if</span> (!securityQs.Any()) <span class="kw">return</span>;
+
+        <span class="cmt">// Spawn a specialised security agent to answer security questions</span>
+        <span class="kw">var</span> secAgent = <span class="kw">new</span> <span class="ty">SecurityAuditAgent</span>(<span class="ty">Guid</span>.NewGuid(), ctx.Session!.ProjectId, secPrompt);
+        <span class="kw">var</span> secResult = <span class="kw">await</span> secAgent.RunAsync(
+            <span class="str">$"Answer these security questions: {FormatQuestions(securityQs)}"</span>,
+            chatClient, <span class="ty">NoOpWriter</span>.Instance, ct);
+
+        <span class="cmt">// Extract answers from security agent's deliverables/decisions</span>
+        <span class="kw">var</span> answers = ExtractAnswers(secResult, securityQs);
+
+        <span class="cmt">// Feed answers back to the originating agent for session 2</span>
+        _agentA.SupplyAnswers(answers);
+    }
+}</code></pre>
+
+    <h3>Pattern 3 — Question Broker Service</h3>
+    <p>
+      A centralised <code>IQuestionBroker</code> service routes questions by ID prefix to the
+      appropriate specialist agent. Questions are enqueued after each session and processed asynchronously.
+    </p>
+    <pre><code><span class="kw">public interface</span> <span class="ty">IQuestionBroker</span>
+{
+    Task <span class="prop">EnqueueAsync</span>(<span class="ty">string</span> originAgentId, <span class="ty">IReadOnlyList</span>&lt;<span class="ty">Question</span>&gt; questions, <span class="ty">CancellationToken</span> ct);
+    Task&lt;<span class="ty">IReadOnlyList</span>&lt;<span class="ty">AnswerRecord</span>&gt;&gt; <span class="prop">WaitForAnswersAsync</span>(<span class="ty">string</span> originAgentId, <span class="ty">CancellationToken</span> ct);
+}
+
+<span class="cmt">// Routing rules (configure in DI / appsettings)</span>
+broker.RegisterRoute(<span class="str">"UX-"</span>,   uxAgent);
+broker.RegisterRoute(<span class="str">"SEC-"</span>,  secAgent);
+broker.RegisterRoute(<span class="str">"ARCH-"</span>, archAgent);
+broker.RegisterRoute(<span class="str">"*"</span>,    humanReviewQueue);</code></pre>
+
+    <h3>Pattern 4 — Hub Orchestrator</h3>
+    <p>
+      A dedicated <strong>OrchestratorAgent</strong> (itself an <code>AgentAggregate</code>) runs first,
+      decomposes the work into sub-problems, spawns specialised agents in parallel, collects their
+      deliverables, and aggregates results. Each specialist agent raises its own questions; the
+      orchestrator collects and routes them.
+    </p>
+    <div class="diagram">
+      <div class="mermaid">
+graph TD
+    O["OrchestratorAgent<br/>(runs full pipeline)"]
+    O -->|"spawns"| A["ArchitectAgent<br/>(ARCH- questions)"]
+    O -->|"spawns"| S["SecurityAgent<br/>(SEC- questions)"]
+    O -->|"spawns"| U["UXAgent<br/>(UX- questions)"]
+    A -->|"Deliverables + Answers"| O
+    S -->|"Deliverables + Answers"| O
+    U -->|"Deliverables + Answers"| O
+    O -->|"SupplyAnswers to origin agents"| FEED["Feed-back loop"]
+
+    style O fill:#252836,stroke:#6c63ff,color:#e2e8f0
+    style A fill:#252836,stroke:#00d4ff,color:#e2e8f0
+    style S fill:#252836,stroke:#ff6b9d,color:#e2e8f0
+    style U fill:#252836,stroke:#3dd68c,color:#e2e8f0
+    style FEED fill:#252836,stroke:#ffd166,color:#e2e8f0
+      </div>
+    </div>
+
+    <h3>Question ID Conventions</h3>
+    <p>Use a consistent prefix scheme so routing rules are simple:</p>
+    <table>
+      <thead><tr><th>Prefix</th><th>Domain</th><th>Resolved by</th></tr></thead>
+      <tbody>
+        <tr><td><code>UX-</code></td><td>User experience / design</td><td>UX Agent or product owner</td></tr>
+        <tr><td><code>ARCH-</code></td><td>Architecture decisions</td><td>Architect Agent or tech lead</td></tr>
+        <tr><td><code>SEC-</code></td><td>Security concerns</td><td>Security Agent or CISO</td></tr>
+        <tr><td><code>DATA-</code></td><td>Data modelling</td><td>Data Agent or DBA</td></tr>
+        <tr><td><code>BIZ-</code></td><td>Business rules</td><td>Human (product owner)</td></tr>
+        <tr><td><code>IMPL-</code></td><td>Implementation detail</td><td>Same agent, next session</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout green">
+      <strong>Key insight:</strong> Questions are the <em>only</em> structured output that crosses
+      agent boundaries in this framework. Deliverables are files/records for humans;
+      Questions are structured inter-agent contracts. By namespacing question IDs,
+      you get automatic routing, auditability, and a clear ownership model without
+      any additional infrastructure.
+    </div>
+  </section>
+
+  <div style="height:80px;"></div>
+</main>
+
+<script>
+  // ── Mermaid init ──
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#1a1d27',
+      primaryColor: '#252836',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#2e3250',
+      lineColor: '#6c63ff',
+      secondaryColor: '#1a1d27',
+      tertiaryColor: '#0f1117',
+      edgeLabelBackground: '#1a1d27',
+      nodeBorder: '#2e3250',
+      clusterBkg: '#1a1d27',
+      titleColor: '#e2e8f0',
+    }
+  });
+
+  // ── Scroll-spy ──
+  const links = document.querySelectorAll('nav a');
+  const sections = [...links].map(l => document.querySelector(l.getAttribute('href')));
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector(`nav a[href="#${e.target.id}"]`);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  sections.forEach(s => s && obs.observe(s));
+</script>
+</body>
+</html>

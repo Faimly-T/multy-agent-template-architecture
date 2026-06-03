@@ -1,12 +1,13 @@
 using AgentFramework.Core.Agent;
+using AgentFramework.Core.Agent.Prompts;
 
 namespace AgentFramework.Core.Tests;
 
 public class RoleTests
 {
-    private const string TestDataPath = "TestData/UxPersonaRole.md";
+    private const string TestDataPath = "TestData/UxAgentRole.md";
 
-    private static Role LoadRole()
+    private static RoleDefinition LoadRole()
     {
         var markdown = File.ReadAllText(TestDataPath);
         return RoleParser.ParseFromMarkdown(markdown);
