@@ -25,8 +25,9 @@ public interface IStepChain
     /// and stored in the session via <see cref="Session.ISessionWriter.RecordStepJournal"/>.
     /// </returns>
     Task<(string FinalJson, IReadOnlyList<HandlerExchange> Journal)> RunAsync(
-        IAgentRunContext? context,
-        ISessionWriter    writer,
-        IChatClient       chatClient,
-        CancellationToken ct);
+        IAgentRunContext?       context,
+        ISessionWriter          writer,
+        IChatClient             chatClient,
+        Func<string, string?>?  instructionLookup,
+        CancellationToken       ct);
 }

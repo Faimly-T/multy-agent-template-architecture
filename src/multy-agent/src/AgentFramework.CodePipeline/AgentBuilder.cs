@@ -37,6 +37,7 @@ public sealed class AgentBuilder
 
     private readonly AgentConfig                        _config;
     private          ISkillResolver?                    _resolver;
+    private          Func<string, string?>?             _instructionLookup;
     private readonly Dictionary<PipelineStep, StepSlot> _slots = new();
 
     private AgentBuilder(AgentConfig config) => _config = config;
@@ -46,6 +47,18 @@ public sealed class AgentBuilder
     public AgentBuilder WithResolver(ISkillResolver resolver)
     {
         _resolver = resolver;
+        return this;
+    }
+
+    /// <summary>
+    /// Supplies a delegate that returns a runtime instruction override for a given handler name.
+    /// When set, <c>SequentialCommandHandlerChain</c> calls this before each handler and applies
+    /// the returned string via <c>CommandHandlerBase.RuntimeInstructionOverride</c>, shadowing the
+    /// handler's compiled-in default. Pass <c>null</c> (or omit) to use all compiled defaults.
+    /// </summary>
+    public AgentBuilder WithInstructionLookup(Func<string, string?>? lookup)
+    {
+        _instructionLookup = lookup;
         return this;
     }
 
@@ -91,7 +104,7 @@ public sealed class AgentBuilder
             var chain   = new SequentialCommandHandlerChain(slot.HandlersFactory(ctx));
             var step    = slot.StepFactory is not null
                 ? slot.StepFactory(ctx, stepNum, cfg, chain)
-                : DefaultStep(position, ctx, stepNum, cfg, chain);
+                : DefaultStep(position, ctx, stepNum, cfg, chain);  // instance call — uses _instructionLookup
 
             steps.Add(step);
         }
@@ -116,18 +129,18 @@ public sealed class AgentBuilder
         _                     => throw new ArgumentOutOfRangeException(nameof(position))
     };
 
-    private static AgentStep DefaultStep(
+    private AgentStep DefaultStep(
         PipelineStep     position,
         IStepPromptLayer ctx,
         int              stepNum,
         StepConfig       cfg,
         IStepChain?      chain) => position switch
     {
-        PipelineStep.Kickoff  => new KickoffStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain),
-        PipelineStep.Capture  => new CaptureStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain),
-        PipelineStep.Organize => new OrganizeStep(ctx, stepNum, cfg.Instructions, cfg.Gate, chain),
-        PipelineStep.Distill  => new DistillStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain),
-        PipelineStep.Express  => new ExpressStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain),
+        PipelineStep.Kickoff  => new KickoffStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain, _instructionLookup),
+        PipelineStep.Capture  => new CaptureStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain, _instructionLookup),
+        PipelineStep.Organize => new OrganizeStep(ctx, stepNum, cfg.Instructions, cfg.Gate, chain, _instructionLookup),
+        PipelineStep.Distill  => new DistillStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain, _instructionLookup),
+        PipelineStep.Express  => new ExpressStep (ctx, stepNum, cfg.Instructions, cfg.Gate, chain, _instructionLookup),
         _                     => throw new ArgumentOutOfRangeException(nameof(position))
     };
 

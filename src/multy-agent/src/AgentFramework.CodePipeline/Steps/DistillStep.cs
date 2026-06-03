@@ -11,12 +11,13 @@ namespace AgentFramework.CodePipeline;
 public class DistillStep : AgentStep
 {
     public DistillStep(
-        IStepPromptLayer stepContext,
-        int              stepNumber,
-        string           instructions,
-        Gate             gate,
-        IStepChain?      chain = null)
-        : base(stepContext, stepNumber, instructions, gate, chain) { }
+        IStepPromptLayer       stepContext,
+        int                    stepNumber,
+        string                 instructions,
+        Gate                   gate,
+        IStepChain?            chain             = null,
+        Func<string, string?>? instructionLookup = null)
+        : base(stepContext, stepNumber, instructions, gate, chain, instructionLookup) { }
 
     /// <summary>Gate: at least one group has been distilled and at least one island is distilled.</summary>
     protected override bool EvaluateGate(JsonElement root, IReadOnlyList<HandlerExchange> journal)

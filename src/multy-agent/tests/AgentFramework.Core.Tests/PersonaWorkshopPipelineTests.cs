@@ -33,6 +33,24 @@ public class PersonaWorkshopPipelineTests
     }
 
     // ================================================================
+    // Repository path — config + instructions loaded from JSON file
+    // ================================================================
+
+    [Fact]
+    public async Task LoadConfig_FromJson_BuildsAndRunsFullPipeline()
+    {
+        var repo    = TestSteps.DefaultRepository();
+        var config  = await repo.GetConfigAsync();
+        var agent   = await UxAgent.BuildAsync(config!, TestSteps.DefaultResolver(), repo);
+        var client  = new ScholarshipFakeClient();
+        var results = await agent.ExecuteAllStepsAsync(TestSteps.ScholarshipIntent, client);
+
+        Assert.Equal(6, results.Count);
+        Assert.True(agent.IsCompleted);
+        Assert.All(results, r => Assert.True(r.GateSatisfied));
+    }
+
+    // ================================================================
     // Full pipeline smoke test
     // ================================================================
 

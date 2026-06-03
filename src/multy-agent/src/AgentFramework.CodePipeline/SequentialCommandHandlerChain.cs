@@ -26,15 +26,19 @@ namespace AgentFramework.CodePipeline;
 public sealed class SequentialCommandHandlerChain(params ICommandHandler[] handlers) : IStepChain
 {
     public async Task<(string FinalJson, IReadOnlyList<HandlerExchange> Journal)> RunAsync(
-        IAgentRunContext? context,
-        ISessionWriter    writer,
-        IChatClient       chatClient,
-        CancellationToken ct)
+        IAgentRunContext?      context,
+        ISessionWriter         writer,
+        IChatClient            chatClient,
+        Func<string, string?>? instructionLookup,
+        CancellationToken      ct)
     {
         var journal = new List<HandlerExchange>();
 
         foreach (var handler in handlers)
         {
+            if (instructionLookup is not null && handler is CommandHandlerBase cb)
+                cb.RuntimeInstructionOverride = instructionLookup(handler.GetType().Name);
+
             var exchange = await handler.ExecuteAiCommandAsync(
                 journal.AsReadOnly(), context, writer, chatClient, ct);
             journal.Add(exchange);

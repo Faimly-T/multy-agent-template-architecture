@@ -5,13 +5,15 @@ using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Steps;
 using AgentFramework.Core.Tests.TestHelpers;
 using AgentFramework.Domain.UxAgent;
+using AgentFramework.Infrastructure.Repositories;
 
 namespace AgentFramework.Core.Tests;
 
 internal static class TestSteps
 {
-    private const string SkillsBasePath = "TestData/Skills";
-    private const string RolePath       = "TestData/UxAgentRole.md";
+    private const string SkillsBasePath  = "TestData/Skills";
+    private const string RolePath        = "TestData/UxAgentRole.md";
+    private const string AgentConfigPath = "TestData/ux-agent-config.json";
 
     // ── Intent constants ──────────────────────────────────────────────────────
 
@@ -27,6 +29,16 @@ internal static class TestSteps
 
     /// <summary>Flat-file skill resolver pointing at the test data Skills folder.</summary>
     public static ISkillResolver DefaultResolver() => new FlatFileSkillResolver(SkillsBasePath);
+
+    // ── Repository ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// JSON-file repository that loads agent config and handler instructions from
+    /// <c>TestData/ux-agent-config.json</c>. Use with
+    /// <c>UxAgent.BuildAsync(config, resolver, repo)</c> to exercise the full repository path.
+    /// </summary>
+    public static IUxAgentRepository DefaultRepository() =>
+        new JsonUxAgentRepository(AgentConfigPath);
 
     // ── Role helper ───────────────────────────────────────────────────────────
 

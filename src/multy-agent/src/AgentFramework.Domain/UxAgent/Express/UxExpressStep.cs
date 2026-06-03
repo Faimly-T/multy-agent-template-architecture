@@ -19,12 +19,13 @@ namespace AgentFramework.Domain.UxAgent.Express;
 public class UxExpressStep : ExpressStep
 {
     public UxExpressStep(
-        IStepPromptLayer stepContext,
-        int              stepNumber,
-        string           instructions,
-        Gate             gate,
-        IStepChain?      chain = null)
-        : base(stepContext, stepNumber, instructions, gate, chain) { }
+        IStepPromptLayer       stepContext,
+        int                    stepNumber,
+        string                 instructions,
+        Gate                   gate,
+        IStepChain?            chain             = null,
+        Func<string, string?>? instructionLookup = null)
+        : base(stepContext, stepNumber, instructions, gate, chain, instructionLookup) { }
 
     // ──────────────────────────────────────────────────────────────────────
     // Gate: require at least the two primary HTML documents to be produced

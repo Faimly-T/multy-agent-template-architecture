@@ -57,15 +57,17 @@ public class UxAgent : AgentAggregate<string>
     /// or construct a custom <see cref="AgentConfig"/> to override any step.
     /// </summary>
     public static async Task<UxAgent> BuildAsync(
-        AgentConfig       config,
-        ISkillResolver    resolver,
-        CancellationToken ct = default)
+        AgentConfig          config,
+        ISkillResolver       resolver,
+        IUxAgentRepository?  repo = null,
+        CancellationToken    ct   = default)
     {
         var agentCtx = PromptContext.ForRole(config.Role);
 
         var pipeline = await AgentBuilder
             .FromConfig(config)
             .WithResolver(resolver)
+            .WithInstructionLookup(repo is not null ? repo.GetHandlerInstruction : null)
 
             .ForStep(PipelineStep.Kickoff, ctx => [
                 new CheckpointValidatorCommand(ctx),
@@ -95,7 +97,8 @@ public class UxAgent : AgentAggregate<string>
                     new NextSessionGuideHandler(ctx),
                     new UxQuestionReviewHandler(ctx)],
                 step: (ctx, num, cfg, chain) =>
-                    new UxExpressStep(ctx, num, cfg.Instructions, cfg.Gate, chain))
+                    new UxExpressStep(ctx, num, cfg.Instructions, cfg.Gate, chain,
+                        repo is not null ? repo.GetHandlerInstruction : null))
 
             .BuildPipelineAsync(ct);
 

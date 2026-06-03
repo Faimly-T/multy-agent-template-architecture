@@ -43,6 +43,15 @@ public abstract class CommandHandlerBase(
     protected readonly string SynthesisInstruction = synthesisInstruction;
 
     /// <summary>
+    /// Set by <c>SequentialCommandHandlerChain.RunAsync</c> before each execution when a
+    /// repository-backed instruction override is available. <c>null</c> means "use the
+    /// compiled-in <see cref="SynthesisInstruction"/>."
+    /// </summary>
+    internal string? RuntimeInstructionOverride { get; set; }
+
+    private string EffectiveInstruction => RuntimeInstructionOverride ?? SynthesisInstruction;
+
+    /// <summary>
     /// Builds the [System, User] message pair for an LLM call.
     /// </summary>
     /// <param name="userContent">The user-turn content.</param>
@@ -75,7 +84,7 @@ public abstract class CommandHandlerBase(
             parts.Add($"Available skill frameworks to execute the instruction:\n{skillsBlock}");
         }
 
-        parts.Add($"You will execute the following instruction:\n{SynthesisInstruction}");
+        parts.Add($"You will execute the following instruction:\n{EffectiveInstruction}");
 
         return [
             new ChatMessage(MessageRole.System, string.Join("\n\n", parts)),

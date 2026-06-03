@@ -60,18 +60,22 @@ public abstract class AgentStep
     /// </summary>
     protected IStepChain? Chain { get; }
 
+    private readonly Func<string, string?>? _instructionLookup;
+
     protected AgentStep(
-        IStepPromptLayer stepContext,
-        int              stepNumber,
-        string           instructions,
-        Gate             gate,
-        IStepChain?      chain = null)
+        IStepPromptLayer       stepContext,
+        int                    stepNumber,
+        string                 instructions,
+        Gate                   gate,
+        IStepChain?            chain              = null,
+        Func<string, string?>? instructionLookup  = null)
     {
-        _stepContext  = stepContext;
-        StepNumber    = stepNumber;
-        Instructions  = instructions;
-        Gate          = gate;
-        Chain         = chain;
+        _stepContext        = stepContext;
+        StepNumber          = stepNumber;
+        Instructions        = instructions;
+        Gate                = gate;
+        Chain               = chain;
+        _instructionLookup  = instructionLookup;
     }
 
     public virtual string BuildContext(IAgentRunContext? context) => string.Empty;
@@ -121,7 +125,7 @@ public abstract class AgentStep
         }
 
         // Chain path — template method
-        var (finalJson, journal) = await Chain.RunAsync(context, writer, chatClient, ct);
+        var (finalJson, journal) = await Chain.RunAsync(context, writer, chatClient, _instructionLookup, ct);
         writer.RecordStepJournal(StepNumber, Name, journal);
 
         using var doc     = JsonDocument.Parse(finalJson);

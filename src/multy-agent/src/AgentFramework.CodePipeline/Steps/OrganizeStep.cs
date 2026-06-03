@@ -11,12 +11,13 @@ namespace AgentFramework.CodePipeline;
 public class OrganizeStep : AgentStep
 {
     public OrganizeStep(
-        IStepPromptLayer stepContext,
-        int              stepNumber,
-        string           instructions,
-        Gate             gate,
-        IStepChain?      chain = null)
-        : base(stepContext, stepNumber, instructions, gate, chain) { }
+        IStepPromptLayer       stepContext,
+        int                    stepNumber,
+        string                 instructions,
+        Gate                   gate,
+        IStepChain?            chain             = null,
+        Func<string, string?>? instructionLookup = null)
+        : base(stepContext, stepNumber, instructions, gate, chain, instructionLookup) { }
 
     /// <summary>Gate: at least one group must exist that is not explicitly Blocked.</summary>
     protected override bool EvaluateGate(JsonElement root, IReadOnlyList<HandlerExchange> journal)

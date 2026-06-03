@@ -9,12 +9,13 @@ namespace AgentFramework.CodePipeline;
 public class KickoffStep : AgentStep
 {
     public KickoffStep(
-        IStepPromptLayer stepContext,
-        int              stepNumber,
-        string           instructions,
-        Gate             gate,
-        IStepChain?      chain = null)
-        : base(stepContext, stepNumber, instructions, gate, chain) { }
+        IStepPromptLayer       stepContext,
+        int                    stepNumber,
+        string                 instructions,
+        Gate                   gate,
+        IStepChain?            chain             = null,
+        Func<string, string?>? instructionLookup = null)
+        : base(stepContext, stepNumber, instructions, gate, chain, instructionLookup) { }
 
     public override string JsonResponseSchema => """
         {
