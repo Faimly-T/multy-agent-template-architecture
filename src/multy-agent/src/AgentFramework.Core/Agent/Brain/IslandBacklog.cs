@@ -34,10 +34,13 @@ public sealed class IslandBacklog
 
     /// <summary>
     /// Merges incoming captured islands into the backlog, skipping any with an ID that
-    /// already exists. Returns the IDs of newly added islands for checkpoint tracking.
+    /// already exists in the backlog (cross-iteration dedup). Throws on same-batch duplicates.
+    /// Returns the IDs of newly added islands for checkpoint tracking.
     /// </summary>
     internal IReadOnlyList<string> MergeCaptured(IReadOnlyList<CapturedIsland> incoming)
     {
+        ValidateNoDuplicateIds(incoming.Select(i => i.Id));
+
         var added = new List<string>();
         foreach (var c in incoming)
         {
@@ -86,6 +89,8 @@ public sealed class IslandBacklog
             var island = _islands[index];
 
             var newStatus = dist.NewStatus;
+            if (island.Status == newStatus) continue; // idempotent: already at target (cross-iteration)
+
             ValidateTransition(island, newStatus);
             _islands[index] = island.WithStatus(newStatus);
         }
