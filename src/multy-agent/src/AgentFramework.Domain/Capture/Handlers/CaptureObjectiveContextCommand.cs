@@ -23,7 +23,7 @@ internal sealed class CaptureObjectiveContextCommand : ICommandHandler
         var objective = agentContext?.Session?.CurrentCheckpoint?.SessionObjective
             ?? "No objective defined — capture broadly.";
 
-        var existingIslands = agentContext?.Session?.Backlog.All ?? [];
+        var existingIslands = agentContext?.Brain?.Backlog.All ?? [];
         var deliverables    = agentContext?.Deliverables ?? [];
 
         var islandSection = existingIslands.Count > 0

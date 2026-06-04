@@ -1,5 +1,6 @@
 using AgentFramework.CodePipeline;
 using AgentFramework.Core.Agent;
+using AgentFramework.Core.Agent.Session;
 using AgentFramework.Core.Agent.Ports;
 using AgentFramework.Core.Agent.Prompts;
 using AgentFramework.Core.Agent.Steps;
@@ -41,10 +42,10 @@ public class UxAgent : AgentAggregate<string>
 {
     protected UxAgent(
         string           agentId,
-        string           projectId,
+        BrainAggregate   brain,
         IStepPromptLayer agentPrompt,
         StepPipeline     pipeline)
-        : base(agentId, projectId, agentPrompt)
+        : base(agentId, brain, agentPrompt)
     {
         Pipeline = pipeline;
     }
@@ -55,13 +56,17 @@ public class UxAgent : AgentAggregate<string>
     /// The single factory method for building a <see cref="UxAgent"/>.
     /// Supply an <see cref="AgentConfig"/> — use <see cref="UxAgentDefaults.Config"/> for defaults
     /// or construct a custom <see cref="AgentConfig"/> to override any step.
+    /// Optionally pass a <paramref name="brain"/> loaded from <c>IBrainRepository</c>;
+    /// when omitted a fresh Brain is created for the project.
     /// </summary>
     public static async Task<UxAgent> BuildAsync(
         AgentConfig          config,
         ISkillResolver       resolver,
-        IUxAgentRepository?  repo = null,
-        CancellationToken    ct   = default)
+        IUxAgentRepository?  repo  = null,
+        BrainAggregate?      brain = null,
+        CancellationToken    ct    = default)
     {
+        brain    ??= new BrainAggregate(config.ProjectId);
         var agentCtx = PromptContext.ForRole(config.Role);
 
         var pipeline = await AgentBuilder
@@ -102,6 +107,6 @@ public class UxAgent : AgentAggregate<string>
 
             .BuildPipelineAsync(ct);
 
-        return new UxAgent(config.AgentId, config.ProjectId, agentCtx, pipeline);
+        return new UxAgent(config.AgentId, brain, agentCtx, pipeline);
     }
 }

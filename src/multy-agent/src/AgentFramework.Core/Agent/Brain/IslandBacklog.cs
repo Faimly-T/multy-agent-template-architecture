@@ -30,6 +30,34 @@ public sealed class IslandBacklog
         }
     }
 
+    // --- Batch: Merge (accumulate without duplicates — used by BrainAggregate) ---
+
+    /// <summary>
+    /// Merges incoming captured islands into the backlog, skipping any with an ID that
+    /// already exists. Returns the IDs of newly added islands for checkpoint tracking.
+    /// </summary>
+    internal IReadOnlyList<string> MergeCaptured(IReadOnlyList<CapturedIsland> incoming)
+    {
+        var added = new List<string>();
+        foreach (var c in incoming)
+        {
+            if (_islands.All(i => i.Id != c.Id))
+            {
+                _islands.Add(new Island(c.Id, c.Type, c.Description, c.Source, c.RelatesToIslandId));
+                added.Add(c.Id);
+            }
+        }
+        return added.AsReadOnly();
+    }
+
+    // --- Restore (used by BrainAggregate.FromState — bypasses merge/validate) ---
+
+    internal void Restore(IReadOnlyList<Island> islands)
+    {
+        _islands.Clear();
+        _islands.AddRange(islands);
+    }
+
     // --- Batch: Organize ---
 
     internal void ApplyOrganization(IReadOnlyList<IslandOrganization> organizations)

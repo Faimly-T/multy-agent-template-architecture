@@ -13,7 +13,14 @@ namespace AgentFramework.Core.Agent;
 public interface IAgentRunContext
 {
     /// <summary>
-    /// The full session — checkpoints, brain (islands/groups/decisions), and convenience delegates.
+    /// The project's shared knowledge base — islands, groups, decisions, deliverables,
+    /// and the lineage chain. Accumulates across all agents and sessions for the project.
+    /// </summary>
+    BrainAggregate? Brain { get; }
+
+    /// <summary>
+    /// The session tracking record — checkpoints, token consumption, and step journals.
+    /// Use <c>Session.CurrentCheckpoint.SessionObjective</c> for the current objective.
     /// <c>null</c> only before the very first iteration starts.
     /// </summary>
     AgentSession? Session { get; }

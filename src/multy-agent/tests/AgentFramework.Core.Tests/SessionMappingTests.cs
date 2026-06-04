@@ -42,10 +42,10 @@ public class SessionMappingTests
         await agent.ExecuteNextStepAsync(client);
         await agent.ExecuteNextStepAsync(client);
 
-        Assert.Equal(3, agent.Session!.Islands.Count);
-        Assert.Equal("ISL-001", agent.Session.Islands[0].Id);
-        Assert.Equal(IslandType.UserType, agent.Session.Islands[0].Type);
-        Assert.Equal(IslandStatus.Captured, agent.Session.Islands[0].Status);
+        Assert.Equal(3, agent.Brain.Islands.Count);
+        Assert.Equal("ISL-001", agent.Brain.Islands[0].Id);
+        Assert.Equal(IslandType.UserType, agent.Brain.Islands[0].Type);
+        Assert.Equal(IslandStatus.Captured, agent.Brain.Islands[0].Status);
     }
 
     [Fact]
@@ -57,8 +57,8 @@ public class SessionMappingTests
         await agent.ExecuteNextStepAsync(client);
         await agent.ExecuteNextStepAsync(client);
 
-        Assert.Null(agent.Session!.Islands[0].RelatesToIslandId);
-        Assert.Equal("ISL-001", agent.Session.Islands[2].RelatesToIslandId);
+        Assert.Null(agent.Brain.Islands[0].RelatesToIslandId);
+        Assert.Equal("ISL-001", agent.Brain.Islands[2].RelatesToIslandId);
     }
 
     // --- Step 3: Organize → maps decisions + island status ---
@@ -73,9 +73,9 @@ public class SessionMappingTests
         await agent.ExecuteNextStepAsync(client); // Step 2
         await agent.ExecuteNextStepAsync(client); // Step 3
 
-        Assert.Equal(IslandStatus.Organized, agent.Session!.Islands[0].Status);
-        Assert.Equal(IslandStatus.Organized, agent.Session.Islands[1].Status);
-        Assert.Equal(IslandStatus.Discarded, agent.Session.Islands[2].Status);
+        Assert.Equal(IslandStatus.Organized, agent.Brain.Islands[0].Status);
+        Assert.Equal(IslandStatus.Organized, agent.Brain.Islands[1].Status);
+        Assert.Equal(IslandStatus.Discarded, agent.Brain.Islands[2].Status);
     }
 
     [Fact]
@@ -109,8 +109,8 @@ public class SessionMappingTests
         await agent.ExecuteNextStepAsync(client); // 3
         await agent.ExecuteNextStepAsync(client); // 4
 
-        Assert.Equal(IslandStatus.Distilled, agent.Session!.Islands[0].Status);
-        Assert.Equal(IslandStatus.Distilled, agent.Session.Islands[1].Status);
+        Assert.Equal(IslandStatus.Distilled, agent.Brain.Islands[0].Status);
+        Assert.Equal(IslandStatus.Distilled, agent.Brain.Islands[1].Status);
 
         Assert.Single(agent.Deliverables);
         Assert.Equal("DEL-001", agent.Deliverables[0].DeliverableId);
@@ -147,7 +147,7 @@ public class SessionMappingTests
         Assert.True(agent.IsCompleted);
 
         Assert.Equal("Build personas for a college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
-        Assert.Equal(3, agent.Session.Islands.Count);
+        Assert.Equal(3, agent.Brain.Islands.Count);
         Assert.Single(agent.Decisions);
         Assert.Single(agent.Deliverables);
         Assert.Equal(7000, agent.Session.CurrentCheckpoint.TokensConsumption.TotalTokens);

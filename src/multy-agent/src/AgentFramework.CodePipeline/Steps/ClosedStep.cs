@@ -85,9 +85,10 @@ public class ClosedStep : AgentStep
         if (session.CurrentCheckpoint is null)
             issues.Add("No checkpoint recorded — Kickoff may not have run.");
 
-        var allIslands     = session.Islands;
-        var distilledCount = session.Backlog.GetByStatus(IslandStatus.Distilled).Count;
-        var discardedCount = session.Backlog.GetByStatus(IslandStatus.Discarded).Count;
+        var brain          = context.Brain;
+        var allIslands     = brain?.Islands ?? [];
+        var distilledCount = brain?.Backlog.GetByStatus(IslandStatus.Distilled).Count ?? 0;
+        var discardedCount = brain?.Backlog.GetByStatus(IslandStatus.Discarded).Count ?? 0;
         var processedCount = distilledCount + discardedCount;
 
         if (allIslands.Count == 0)
@@ -95,7 +96,7 @@ public class ClosedStep : AgentStep
         else if (processedCount < allIslands.Count)
             issues.Add($"{allIslands.Count - processedCount} island(s) still unprocessed.");
 
-        if (!session.Groups.Any())
+        if (!(brain?.Groups.Any() ?? false))
             issues.Add("No groups were formed.");
 
         if (!context.Decisions.Any())
@@ -107,7 +108,7 @@ public class ClosedStep : AgentStep
         var summary = issues.Count == 0
             ? $"All checks passed — " +
               $"islands: {allIslands.Count} ({distilledCount} distilled, {discardedCount} discarded), " +
-              $"groups: {session.Groups.Count}, " +
+              $"groups: {brain?.Groups.Count ?? 0}, " +
               $"decisions: {context.Decisions.Count}, " +
               $"deliverables: {context.Deliverables.Count}."
             : $"{issues.Count} issue(s): {string.Join(" | ", issues)}";

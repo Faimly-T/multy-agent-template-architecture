@@ -14,20 +14,24 @@ namespace AgentFramework.Domain.Distill.Handlers;
 /// </summary>
 internal sealed class GroupDistillationHandler : CommandHandlerBase
 {
+    // Extends BrainAggregate.DistillationSchema with UX-specific question capture.
+    // decisions/deliverables/distilledIslands must stay in sync with Brain's parser; questions are handler-specific.
     private const string DistillSchema = """
         {
           "groupDistillations": [
             {
               "groupId": "GRP-001",
               "decisions": [
-                { "id": "DEC-001", "description": "string — the HOW decision for this group", "impact": "string" }
+                { "id": "DEC-001", "description": "string — the HOW decision for this group", "impact": "string", "islandId": "ISL-XXX" }
               ],
               "deliverables": [
                 {
                   "deliverableId": "DEL-001",
                   "path": "outputs/personas/filename.html",
-                  "purpose": "string — why this deliverable and what it should express",
-                  "status": "Draft | Partial | Complete"
+                  "purpose": "string — why this deliverable and what it must express",
+                  "status": "Draft",
+                  "islandIds": ["ISL-001", "ISL-003"],
+                  "decisionIds": ["DEC-001"]
                 }
               ],
               "questions": [
@@ -65,10 +69,10 @@ internal sealed class GroupDistillationHandler : CommandHandlerBase
         IChatClient?      chatClient,
         CancellationToken ct)
     {
-        var session   = agentContext?.Session;
-        var objective = session?.CurrentCheckpoint?.SessionObjective ?? "No objective defined";
-        var groups    = session?.Groups ?? [];
-        var organized = session?.Backlog.GetByStatus(IslandStatus.Organized) ?? [];
+        var brain     = agentContext?.Brain;
+        var objective = agentContext?.Session?.CurrentCheckpoint?.SessionObjective ?? "No objective defined";
+        var groups    = brain?.Groups ?? [];
+        var organized = brain?.Backlog.GetByStatus(IslandStatus.Organized) ?? [];
         var decisions = agentContext?.Decisions ?? [];
         var questions = agentContext?.Questions ?? [];
 

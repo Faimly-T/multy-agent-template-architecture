@@ -13,19 +13,8 @@ namespace AgentFramework.Domain.Capture.Handlers;
 /// </summary>
 internal sealed class IslandFromObjectiveHandler : CommandHandlerBase
 {
-    private const string IslandSchema = """
-        {
-          "islands": [
-            {
-              "id": "ISL-XXX",
-              "type": "UserType | Goal | PainPoint | BehavioralPattern | ContextOfUse | EmotionalState | AntiUser | Stakeholder | AccessibilitySignal",
-              "description": "string",
-              "source": "six-hats:{hat-color}",
-              "relatesToIslandId": "ISL-XXX or null"
-            }
-          ]
-        }
-        """;
+    // Schema lives in BrainAggregate — handlers reference it so the LLM format stays in sync with Brain's parser.
+    private static string IslandSchema => BrainAggregate.IslandSchema;
 
     private const string Instruction =
         "You are a UX research analyst applying the Six Thinking Hats method to identify user insights. " +

@@ -54,8 +54,8 @@ public class DistillStep : AgentStep
     {
         if (context is null) return "No session context";
 
-        var groups    = context.Session?.Groups ?? [];
-        var organized = context.Session?.Backlog.GetByStatus(IslandStatus.Organized) ?? [];
+        var groups    = context.Brain?.Groups ?? [];
+        var organized = context.Brain?.Backlog.GetByStatus(IslandStatus.Organized) ?? [];
         var decisions = context.Decisions;
 
         var groupLines = groups.Select(g =>

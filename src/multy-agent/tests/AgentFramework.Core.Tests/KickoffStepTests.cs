@@ -170,7 +170,7 @@ public class KickoffStepTests
     public async Task ApplyTo_PreservesExistingSessionState()
     {
         var agent = await CreateAgentAsync();
-        agent.Session!.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "input")
         ]);
         agent.RaiseQuestion("UX-Q001", "What sport?", "express");
@@ -179,7 +179,7 @@ public class KickoffStepTests
         result.ApplyTo(agent);
 
         Assert.Equal("Refined objective", agent.Session!.CurrentCheckpoint!.SessionObjective);
-        Assert.Single(agent.Session.Backlog.All);
+        Assert.Single(agent.Brain.Backlog.All);
         Assert.Single(agent.Questions);
     }
 

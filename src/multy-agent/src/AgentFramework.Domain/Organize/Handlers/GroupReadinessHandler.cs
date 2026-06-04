@@ -49,7 +49,7 @@ internal sealed class GroupReadinessHandler : CommandHandlerBase
     {
         var groupsJson  = context.LastOutput() ?? """{"groups":[]}""";
         var session     = agentContext?.Session;
-        var islandLookup = (session?.Backlog.All ?? [])
+        var islandLookup = (agentContext?.Brain?.Backlog.All ?? [])
             .ToDictionary(i => i.Id, i => $"{i.Type}: {i.Description}");
 
         var userContent = $"""

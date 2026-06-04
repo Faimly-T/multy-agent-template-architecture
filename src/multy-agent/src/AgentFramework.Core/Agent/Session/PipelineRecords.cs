@@ -9,11 +9,13 @@ namespace AgentFramework.Core.Agent.Session;
 public record DeliverableRecord(string DeliverableId, string Path, DeliverableStatus Status);
 
 public record GroupDeliverableRecord(
-    string            GroupId,
-    string            DeliverableId,
-    string            Path,
-    string            Purpose,
-    DeliverableStatus Status);
+    string                 GroupId,
+    string                 DeliverableId,
+    string                 Path,
+    string                 Purpose,
+    DeliverableStatus      Status,
+    IReadOnlyList<string>? IslandIds   = null,
+    IReadOnlyList<string>? DecisionIds = null);
 
 // ── Group Distill output ──────────────────────────────────────────────────────
 

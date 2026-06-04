@@ -64,27 +64,29 @@ public class AgentAggregate<TId> :
     public IReadOnlyList<AgentStep> Steps => Pipeline.Steps;
     public bool IsCompleted => Pipeline.IsCompleted;
 
+    // ── Brain (injected — not owned, shared across all agents on the project) ──
+
+    private BrainAggregate _brain = default!;
+
+    /// <summary>The project's shared Brain — owns all reasoning state and deliverables.</summary>
+    public BrainAggregate Brain => _brain;
+
     // ── Domain outputs ────────────────────────────────────────────────────────
 
-    private readonly List<Question>    _questions    = [];
-    private readonly List<Deliverable> _deliverables = [];
+    private readonly List<Question> _questions = [];
 
     public IReadOnlyList<Question>    Questions    => _questions.AsReadOnly();
-    public IReadOnlyList<Deliverable> Deliverables => _deliverables.AsReadOnly();
-
-    /// <summary>
-    /// Decisions are owned by the brain — read directly from the session.
-    /// All reasoning decisions (organize + distill) are stored in <see cref="AgentBrain"/>.
-    /// </summary>
-    public IReadOnlyList<Decision> Decisions => Session?.Brain.Decisions ?? [];
+    public IReadOnlyList<Deliverable> Deliverables => _brain?.Deliverables ?? [];
+    public IReadOnlyList<Decision>    Decisions    => _brain?.Decisions    ?? [];
 
     protected AgentAggregate() { }
 
-    public AgentAggregate(TId id, string projectId, IStepPromptLayer agentPromptContext)
+    public AgentAggregate(TId id, BrainAggregate brain, IStepPromptLayer agentPromptContext)
     {
         Id                     = id;
+        _brain                 = brain;
         RolePromptAgentContext = agentPromptContext;
-        Session                = new AgentSession(projectId);
+        Session                = new AgentSession(brain.Id.ProjectId);
     }
 
     // ── Question Queries ──────────────────────────────────────────────────────
@@ -243,10 +245,11 @@ public class AgentAggregate<TId> :
     // IAgentRunContext
     // ==========================================================
 
+    BrainAggregate?            IAgentRunContext.Brain             => _brain;
     AgentSession?              IAgentRunContext.Session           => Session;
     IReadOnlyList<Question>    IAgentRunContext.Questions         => _questions.AsReadOnly();
-    IReadOnlyList<Decision>    IAgentRunContext.Decisions         => Session?.Brain.Decisions ?? [];
-    IReadOnlyList<Deliverable> IAgentRunContext.Deliverables      => _deliverables.AsReadOnly();
+    IReadOnlyList<Decision>    IAgentRunContext.Decisions         => _brain?.Decisions ?? [];
+    IReadOnlyList<Deliverable> IAgentRunContext.Deliverables      => _brain?.Deliverables ?? [];
     AgentRequest?              IAgentRunContext.PendingRequest    => _pendingRequest;
 
     IReadOnlyList<HandlerExchange> IAgentRunContext.GetStepJournal(string stepName)
@@ -259,6 +262,7 @@ public class AgentAggregate<TId> :
     void ISessionWriter.BeginIteration(string sessionObjective)
     {
         Session?.BeginIteration(sessionObjective, _pendingRequest?.Intent ?? string.Empty);
+        _brain?.BeginCheckpoint(Id!.ToString()!, sessionObjective);
         _pendingRequest = null;
     }
 
@@ -274,41 +278,35 @@ public class AgentAggregate<TId> :
     void ISessionWriter.FinalizeSession(DateTime closedAt)
     {
         Session?.FinalizeSession(closedAt);
+        _brain?.FinalizeCheckpoint(closedAt);
     }
 
     // ==========================================================
-    // IBrainWriter — delegates to Session.Brain
+    // IBrainWriter — delegates to BrainAggregate
     // ==========================================================
 
     void IBrainWriter.SetCapturedIslands(IReadOnlyList<CapturedIsland> islands)
-        => Session?.Brain.SetCapturedIslands(islands);
+        => _brain.SetCapturedIslands(islands);
 
     void IBrainWriter.ApplyOrganization(
         IReadOnlyList<IslandOrganization> organizations,
         IReadOnlyList<DecisionRecord>     decisions,
         IReadOnlyList<IslandGroup>        groups)
-        => Session?.Brain.ApplyOrganization(organizations, decisions, groups);
+        => _brain.ApplyOrganization(organizations, decisions, groups);
 
     void IBrainWriter.ApplyDistillation(
-        IReadOnlyList<IslandDistillation>    distillations,
-        IReadOnlyList<GroupDistillationRecord> groupDistillations)
-        => Session?.Brain.ApplyDistillation(distillations, groupDistillations);
+        IReadOnlyList<IslandDistillation>       distillations,
+        IReadOnlyList<GroupDistillationRecord>  groupDistillations)
+        => _brain.ApplyDistillation(distillations, groupDistillations);
 
     // ==========================================================
-    // IDeliverableTracker
+    // IDeliverableTracker — delegates to BrainAggregate
     // ==========================================================
 
     void IDeliverableTracker.TrackDeliverables(
-        IReadOnlyList<DeliverableRecord>       deliverables,
-        IReadOnlyList<GroupDistillationRecord> groupDistillations)
-    {
-        foreach (var del in deliverables)
-            _deliverables.Add(new Deliverable(del.DeliverableId, del.Path, del.Status));
-
-        foreach (var grp in groupDistillations)
-            foreach (var del in grp.Deliverables)
-                _deliverables.Add(new Deliverable(del.DeliverableId, del.Path, del.Status, del.GroupId, del.Purpose));
-    }
+        IReadOnlyList<DeliverableRecord>        deliverables,
+        IReadOnlyList<GroupDistillationRecord>  groupDistillations)
+        => _brain.TrackDeliverables(deliverables, groupDistillations);
 
     // ==========================================================
     // IQuestionWriter

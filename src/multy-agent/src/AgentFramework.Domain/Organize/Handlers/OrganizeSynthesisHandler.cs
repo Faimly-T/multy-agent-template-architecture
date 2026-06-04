@@ -54,7 +54,7 @@ internal sealed class OrganizeSynthesisHandler : ICommandHandler
         }
 
         // All session islands not yet assigned to a group → standalone (groupId: null)
-        var allIslands = agentContext?.Session?.Backlog.All ?? [];
+        var allIslands = agentContext?.Brain?.Backlog.All ?? [];
         var organized  = new List<(string IslandId, string? GroupId)>();
         foreach (var island in allIslands)
             if (island.Status == Core.Agent.Session.IslandStatus.Captured)

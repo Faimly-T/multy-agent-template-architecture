@@ -10,9 +10,15 @@ namespace AgentFramework.Core.Agent.Session;
 ///
 /// Decisions are immutable value objects. They accumulate across iterations in
 /// <see cref="AgentBrain.Decisions"/> and inform subsequent Kickoff context.
+///
+/// A Decision is anchored to the Island that triggered it (<see cref="IslandId"/>) and
+/// optionally to the Group in which that Island lives (<see cref="GroupId"/>). This
+/// Island→Decision link is the HOW layer of the lineage chain:
+/// Island (WHAT) → Group (WHY) → Decision (HOW) → Deliverable (OUTPUT).
 /// </summary>
 public record Decision(
     string  Id,
     string  Description,
     string  Impact,
-    string? GroupId = null);
+    string? GroupId  = null,
+    string? IslandId = null);

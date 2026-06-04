@@ -12,19 +12,8 @@ namespace AgentFramework.Domain.Organize.Handlers;
 /// </summary>
 internal sealed class IslandGroupingHandler : CommandHandlerBase
 {
-    private const string GroupingSchema = """
-        {
-          "groups": [
-            {
-              "id": "GRP-001",
-              "name": "string — sharp name capturing what the islands are saying",
-              "islandIds": ["ISL-XXX"],
-              "whyTogether": "string — one sentence: what these islands are all expressing"
-            }
-          ],
-          "ungroupedIslandIds": ["ISL-XXX"]
-        }
-        """;
+    // Schema lives in BrainAggregate — handlers reference it so the LLM format stays in sync with Brain's parser.
+    private static string GroupingSchema => BrainAggregate.GroupSchema;
 
     private const string Instruction =
         "You are a strategic analyst applying semantic grouping to a list of research islands. " +
@@ -43,9 +32,9 @@ internal sealed class IslandGroupingHandler : CommandHandlerBase
         IChatClient?      chatClient,
         CancellationToken ct)
     {
-        var session   = agentContext?.Session;
-        var islands   = session?.Backlog.All ?? [];
-        var objective = session?.CurrentCheckpoint?.SessionObjective ?? "No objective defined";
+        var brain     = agentContext?.Brain;
+        var islands   = brain?.Backlog.All ?? [];
+        var objective = agentContext?.Session?.CurrentCheckpoint?.SessionObjective ?? "No objective defined";
 
         var islandList = string.Join("\n", islands.Select(i =>
             $"- {i.Id} [{i.Type}]: {i.Description}" +

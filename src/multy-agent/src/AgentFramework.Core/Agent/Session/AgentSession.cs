@@ -8,17 +8,6 @@ public class AgentSession
     public IReadOnlyList<Checkpoint> Checkpoints => _checkpoints.AsReadOnly();
     public Checkpoint? CurrentCheckpoint => _checkpoints.Count > 0 ? _checkpoints[^1] : null;
 
-    /// <summary>
-    /// The agent's reasoning state — all captured islands, semantic groups, and decisions
-    /// made throughout the pipeline run. See <see cref="AgentBrain"/> for details.
-    /// </summary>
-    public AgentBrain Brain { get; } = new();
-
-    // Convenience delegates into Brain for handlers that read islands/groups directly off the session.
-    public IReadOnlyList<Island>      Islands => Brain.Backlog.All;
-    public IslandBacklog              Backlog => Brain.Backlog;
-    public IReadOnlyList<IslandGroup> Groups  => Brain.Groups;
-
     public AgentSession(string projectId)
     {
         ProjectId = projectId;

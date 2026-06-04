@@ -104,7 +104,7 @@ public class SkillConversationTests
         Assert.Equal(6, results.Count);
         Assert.True(agent.IsCompleted);
         Assert.Equal("Build personas for college athletic recruiting platform", agent.Session!.CurrentCheckpoint!.SessionObjective);
-        Assert.Equal(3, agent.Session.Islands.Count);
+        Assert.Equal(3, agent.Brain.Islands.Count);
         Assert.Single(agent.Decisions);
         Assert.Single(agent.Deliverables);
         Assert.Equal(7000, agent.Session.CurrentCheckpoint!.TokensConsumption.TotalTokens);

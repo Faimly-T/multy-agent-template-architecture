@@ -97,8 +97,8 @@ public class PersonaWorkshopPipelineTests
         await agent.ExecuteNextStepAsync(client); // step 1
         await agent.ExecuteNextStepAsync(client); // step 2
 
-        Assert.Equal(15, agent.Session!.Islands.Count);
-        Assert.All(agent.Session.Islands, i => Assert.Equal(IslandStatus.Captured, i.Status));
+        Assert.Equal(15, agent.Brain.Islands.Count);
+        Assert.All(agent.Brain.Islands, i => Assert.Equal(IslandStatus.Captured, i.Status));
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public class PersonaWorkshopPipelineTests
         await agent.ExecuteNextStepAsync(client);
         await agent.ExecuteNextStepAsync(client);
 
-        var types = agent.Session!.Islands.Select(i => i.Type).Distinct().ToList();
+        var types = agent.Brain.Islands.Select(i => i.Type).Distinct().ToList();
         Assert.Contains(IslandType.UserType,          types);
         Assert.Contains(IslandType.PainPoint,         types);
         Assert.Contains(IslandType.BehavioralPattern, types);
@@ -131,7 +131,7 @@ public class PersonaWorkshopPipelineTests
         await agent.ExecuteNextStepAsync(client); // capture
         await agent.ExecuteNextStepAsync(client); // organize
 
-        Assert.Equal(3, agent.Session!.Groups.Count);
+        Assert.Equal(3, agent.Brain.Groups.Count);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        var names = agent.Session!.Groups.Select(g => g.Name).ToList();
+        var names = agent.Brain.Groups.Select(g => g.Name).ToList();
         Assert.Contains("Max — Elite Ready",           names);
         Assert.Contains("Carlos — Talented but Blocked", names);
         Assert.Contains("Claudia — Academic First",    names);
@@ -156,7 +156,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        foreach (var group in agent.Session!.Groups)
+        foreach (var group in agent.Brain.Groups)
             Assert.Equal(5, group.IslandIds.Count);
     }
 
@@ -168,7 +168,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        Assert.All(agent.Session!.Islands, i => Assert.Equal(IslandStatus.Organized, i.Status));
+        Assert.All(agent.Brain.Islands, i => Assert.Equal(IslandStatus.Organized, i.Status));
     }
 
     [Fact]
@@ -179,7 +179,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        Assert.All(agent.Session!.Islands, i => Assert.NotNull(i.GroupId));
+        Assert.All(agent.Brain.Islands, i => Assert.NotNull(i.GroupId));
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        var maxIslands = agent.Session!.Islands.Where(i => i.GroupId == "GRP-001").ToList();
+        var maxIslands = agent.Brain.Islands.Where(i => i.GroupId == "GRP-001").ToList();
         Assert.All(maxIslands, i => Assert.Equal("GRP-001", i.GroupId));
     }
 
@@ -202,7 +202,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        var groups = agent.Session!.Groups;
+        var groups = agent.Brain.Groups;
         Assert.Equal("Ready",  groups[0].Readiness);
         Assert.Equal("Ready",  groups[1].Readiness);
         Assert.Equal("OneGap", groups[2].Readiness);
@@ -216,7 +216,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 3; i++) await agent.ExecuteNextStepAsync(client);
 
-        Assert.All(agent.Session!.Groups, g => Assert.False(string.IsNullOrWhiteSpace(g.WhyTogether)));
+        Assert.All(agent.Brain.Groups, g => Assert.False(string.IsNullOrWhiteSpace(g.WhyTogether)));
     }
 
     // ================================================================
@@ -310,7 +310,7 @@ public class PersonaWorkshopPipelineTests
 
         for (int i = 0; i < 4; i++) await agent.ExecuteNextStepAsync(client);
 
-        Assert.All(agent.Session!.Islands, i => Assert.Equal(IslandStatus.Distilled, i.Status));
+        Assert.All(agent.Brain.Islands, i => Assert.Equal(IslandStatus.Distilled, i.Status));
     }
 
     // ================================================================
@@ -346,11 +346,11 @@ public class PersonaWorkshopPipelineTests
         Assert.Contains("scholarship", agent.Session!.CurrentCheckpoint!.SessionObjective, StringComparison.OrdinalIgnoreCase);
 
         // Islands: all 15 distilled
-        Assert.Equal(15, agent.Session.Islands.Count);
-        Assert.All(agent.Session.Islands, i => Assert.Equal(IslandStatus.Distilled, i.Status));
+        Assert.Equal(15, agent.Brain.Islands.Count);
+        Assert.All(agent.Brain.Islands, i => Assert.Equal(IslandStatus.Distilled, i.Status));
 
         // Groups: 3
-        Assert.Equal(3, agent.Session.Groups.Count);
+        Assert.Equal(3, agent.Brain.Groups.Count);
 
         // Decisions: 3 (1 per group, from Distill)
         Assert.Equal(3, agent.Decisions.Count);

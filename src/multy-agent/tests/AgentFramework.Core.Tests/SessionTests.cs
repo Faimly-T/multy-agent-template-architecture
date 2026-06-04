@@ -79,12 +79,12 @@ public class SessionTests
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
 
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Student athlete seeking recruitment", "product description")
         ]);
 
-        Assert.Single(session.Backlog.All);
-        var island = session.Backlog.All[0];
+        Assert.Single(agent.Brain.Backlog.All);
+        var island = agent.Brain.Backlog.All[0];
         Assert.Equal("ISL-001", island.Id);
         Assert.Equal(IslandType.UserType, island.Type);
         Assert.Equal("Student athlete seeking recruitment", island.Description);
@@ -98,13 +98,13 @@ public class SessionTests
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
 
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
             new CapturedIsland("ISL-002", IslandType.Goal, "Get recruited", "desc", "ISL-001")
         ]);
 
-        Assert.Null(session.Backlog.All[0].RelatesToIslandId);
-        Assert.Equal("ISL-001", session.Backlog.All[1].RelatesToIslandId);
+        Assert.Null(agent.Brain.Backlog.All[0].RelatesToIslandId);
+        Assert.Equal("ISL-001", agent.Brain.Backlog.All[1].RelatesToIslandId);
     }
 
     [Fact]
@@ -112,17 +112,17 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.PainPoint, "No visibility", "interview")
         ]);
 
-        Assert.Equal(IslandStatus.Captured, session.Backlog.All[0].Status);
+        Assert.Equal(IslandStatus.Captured, agent.Brain.Backlog.All[0].Status);
 
-        session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
-        Assert.Equal(IslandStatus.Organized, session.Backlog.All[0].Status);
+        agent.Brain.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
+        Assert.Equal(IslandStatus.Organized, agent.Brain.Backlog.All[0].Status);
 
-        session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]);
-        Assert.Equal(IslandStatus.Distilled, session.Backlog.All[0].Status);
+        agent.Brain.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]);
+        Assert.Equal(IslandStatus.Distilled, agent.Brain.Backlog.All[0].Status);
     }
 
     [Fact]
@@ -130,18 +130,18 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.AntiUser, "Tourist", "capture"),
             new CapturedIsland("ISL-002", IslandType.UserType, "Athlete", "capture")
         ]);
 
-        session.Backlog.ApplyOrganization([
+        agent.Brain.Backlog.ApplyOrganization([
             new IslandOrganization("ISL-001", IslandStatus.Discarded),
             new IslandOrganization("ISL-002", IslandStatus.Organized)
         ]);
 
-        Assert.Equal(IslandStatus.Discarded, session.Backlog.All[0].Status);
-        Assert.Equal(IslandStatus.Organized, session.Backlog.All[1].Status);
+        Assert.Equal(IslandStatus.Discarded, agent.Brain.Backlog.All[0].Status);
+        Assert.Equal(IslandStatus.Organized, agent.Brain.Backlog.All[1].Status);
     }
 
     // --- IslandBacklog Guard Tests ---
@@ -151,13 +151,13 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
-        session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
+        agent.Brain.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
 
         Assert.Throws<InvalidOperationException>(() =>
-            session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]));
+            agent.Brain.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]));
     }
 
     [Fact]
@@ -165,12 +165,12 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
 
         Assert.Throws<InvalidOperationException>(() =>
-            session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]));
+            agent.Brain.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]));
     }
 
     [Fact]
@@ -178,17 +178,17 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
             new CapturedIsland("ISL-002", IslandType.Goal, "Keep", "desc")
         ]);
-        session.Backlog.ApplyOrganization([
+        agent.Brain.Backlog.ApplyOrganization([
             new IslandOrganization("ISL-001", IslandStatus.Discarded),
             new IslandOrganization("ISL-002", IslandStatus.Organized)
         ]);
 
         Assert.Throws<InvalidOperationException>(() =>
-            session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]));
+            agent.Brain.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]));
     }
 
     [Fact]
@@ -196,14 +196,14 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
-        session.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
-        session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]);
+        agent.Brain.Backlog.ApplyOrganization([new IslandOrganization("ISL-001", IslandStatus.Organized)]);
+        agent.Brain.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Distilled)]);
 
         Assert.Throws<InvalidOperationException>(() =>
-            session.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Discarded)]));
+            agent.Brain.Backlog.ApplyDistillation([new IslandDistillation("ISL-001", IslandStatus.Discarded)]));
     }
 
     // --- ISessionWriter Invariant Tests ---
@@ -250,12 +250,12 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc"),
             new CapturedIsland("ISL-002", IslandType.Stakeholder, "Coach", "desc")
         ]);
 
-        var found = session.Backlog.Find("ISL-002");
+        var found = agent.Brain.Backlog.Find("ISL-002");
 
         Assert.NotNull(found);
         Assert.Equal("Coach", found.Description);
@@ -267,7 +267,7 @@ public class SessionTests
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
 
-        Assert.Null(session.Backlog.Find("NONEXISTENT"));
+        Assert.Null(agent.Brain.Backlog.Find("NONEXISTENT"));
     }
 
     // --- Deliverables (via ISessionWriter) ---
@@ -314,7 +314,7 @@ public class SessionTests
     {
         var agent = await CreateAgentAsync();
         var session = agent.Session!;
-        session.Backlog.SetCaptured([
+        agent.Brain.Backlog.SetCaptured([
             new CapturedIsland("ISL-001", IslandType.UserType, "Athlete", "desc")
         ]);
 

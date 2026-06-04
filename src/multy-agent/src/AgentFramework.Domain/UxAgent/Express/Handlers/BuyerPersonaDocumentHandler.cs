@@ -45,14 +45,14 @@ internal sealed class BuyerPersonaDocumentHandler : CommandHandlerBase
         CancellationToken  ct)
     {
         var session      = agentContext?.Session;
-        var groups       = session?.Groups ?? [];
+        var groups       = agentContext?.Brain?.Groups ?? [];
         var decisions    = agentContext?.Decisions ?? [];
         var deliverables = agentContext?.Deliverables ?? [];
         var objective    = session?.CurrentCheckpoint?.SessionObjective ?? "No objective";
         var userIntent   = session?.CurrentCheckpoint?.UserIntent ?? "No intent recorded";
 
         // Distilled islands carry the persona research data
-        var distilledIslands = session?.Backlog?.GetByStatus(IslandStatus.Distilled) ?? [];
+        var distilledIslands = agentContext?.Brain?.Backlog?.GetByStatus(IslandStatus.Distilled) ?? [];
 
         var groupLines = groups.Any()
             ? string.Join("\n", groups.Select(g =>

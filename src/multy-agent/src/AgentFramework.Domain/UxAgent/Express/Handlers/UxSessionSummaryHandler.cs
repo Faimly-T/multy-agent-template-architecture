@@ -43,8 +43,8 @@ internal sealed class UxSessionSummaryHandler : CommandHandlerBase
         CancellationToken  ct)
     {
         var session      = agentContext?.Session;
-        var backlog      = session?.Backlog;
-        var groups       = session?.Groups ?? [];
+        var backlog      = agentContext?.Brain?.Backlog;
+        var groups       = agentContext?.Brain?.Groups ?? [];
         var decisions    = agentContext?.Decisions ?? [];
         var deliverables = agentContext?.Deliverables ?? [];
         var questions    = agentContext?.Questions ?? [];

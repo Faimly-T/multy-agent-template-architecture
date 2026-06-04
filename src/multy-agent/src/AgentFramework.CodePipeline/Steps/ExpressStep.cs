@@ -48,7 +48,7 @@ public class ExpressStep : AgentStep
         var deliverables = context.Deliverables
             .Select(d => $"- {d.DeliverableId}: {d.Path} ({d.Status})");
 
-        var backlog     = context.Session?.Backlog;
+        var backlog     = context.Brain?.Backlog;
         var islandStats = backlog is not null
             ? $"Islands: {backlog.Count} total, " +
               $"{backlog.GetByStatus(IslandStatus.Distilled).Count} distilled, " +

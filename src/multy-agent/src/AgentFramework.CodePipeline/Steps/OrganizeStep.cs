@@ -57,11 +57,11 @@ public class OrganizeStep : AgentStep
 
     public override string BuildContext(IAgentRunContext? context)
     {
-        var session = context?.Session;
-        if (session is null || session.Backlog.Count == 0)
+        var brain = context?.Brain;
+        if (brain is null || brain.Backlog.Count == 0)
             return "Current Islands: None captured yet";
 
-        var lines = session.Backlog.All.Select(i =>
+        var lines = brain.Backlog.All.Select(i =>
             $"- {i.Id} [{i.Type}] {i.Description} (Status: {i.Status})" +
             (i.RelatesToIslandId is not null ? $" → relates to {i.RelatesToIslandId}" : ""));
         return $"Current Islands:\n{string.Join("\n", lines)}";
